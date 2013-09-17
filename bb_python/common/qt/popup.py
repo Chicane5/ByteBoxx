@@ -6,40 +6,48 @@ Created on 17 Sep 2013
 
 from PyQt4 import QtCore, QtGui
 
-class Warning():
+#===============================================================================
+# 
+#===============================================================================
+class Popup():
     '''
-    BB wrapper for QtMessageBox.warning
+    BB wrapper for QtMessageBox static methods
     '''
     @staticmethod
-    def show(pParent, pText):
+    def warning(pParent, pText):
         QtGui.QMessageBox.warning(pParent, "ByteBoxx Warning", QtCore.QString(pText))
         
-#------------------------------------------------------------------------------ 
-
-class Critical(QtGui.QMessageBox):
-    '''
-    BB wrapper for QtMessageBox.critical
-    '''
     @staticmethod
-    def show(pParent, pText):
+    def critical(pParent, pText):
         QtGui.QMessageBox.critical(pParent, "ByteBoxx Critical", QtCore.QString(pText))
-        
-#------------------------------------------------------------------------------ 
 
-class Info(QtGui.QMessageBox):
-    '''
-    BB wrapper for QtMessageBox.information
-    '''
     @staticmethod
-    def show(pParent, pText):
+    def info(pParent, pText):
         QtGui.QMessageBox.information(pParent, "ByteBoxx Info", QtCore.QString(pText))
         
-#------------------------------------------------------------------------------ 
-
-class Question(QtGui.QMessageBox):
+    @staticmethod
+    def question(pParent, pText):
+        QtGui.QMessageBox.question(pParent, "ByteBoxx Question", QtCore.QString(pText))
+        
+#===============================================================================
+# 
+#===============================================================================
+class FileDialog():
     '''
-    BB wrapper for QtMessageBox.question
+    BB wrapper for QtMessageBox static methods
     '''
     @staticmethod
-    def show(pParent, pText):
-        QtGui.QMessageBox.question(pParent, "ByteBoxx Question", QtCore.QString(pText))
+    def getDirectory(pParent, pText):
+        return QtGui.QFileDialog.getExistingDirectory(pParent, QtCore.QString(pText))
+    
+    @staticmethod
+    def getFile():
+        pass
+    
+    @staticmethod
+    def getFileFilter(self):
+        pass
+        
+
+
+        
