@@ -7,6 +7,7 @@ Created on 10 Sep 2013
 import sys, os
 import datetime as date
 import serial
+import time
 #3rd
 from PyQt4 import QtCore, QtGui
 #user
@@ -240,6 +241,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             popup.Popup.warning(self, "Error creating take directory, check permission")
             
         #sleep to allow images to drop in?
+        time.sleep(8)
         
         #cleanup the images
         lCount = self.mSession.moveImages()
@@ -255,4 +257,3 @@ if __name__ == "__main__":
     win = MW_bbTriggerBoxx()
     win._main()
     app.exec_()
-
