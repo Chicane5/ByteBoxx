@@ -48,6 +48,13 @@ class FileDialog():
     def getFileFilter(self):
         pass
         
-
-
-        
+#===============================================================================
+# 
+#===============================================================================
+class Input():
+    '''
+    BB wrapper for QtInputBox static methods
+    '''
+    @staticmethod
+    def getText(pParent, pText):
+        return QtGui.QInputDialog.getText(pParent, "ByteBoxx Input", QtCore.QString(pText))
