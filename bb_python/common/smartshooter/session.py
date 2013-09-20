@@ -57,7 +57,7 @@ class Session(object):
         while not lFinished:
             for newImage in os.listdir(self.mRootFolder):
                 root, ext = os.path.splitext(newImage)
-                if ext in ('.jpg', '.JPG', '.jpeg', '.JPEG'):
+                if ext in ('.jpg', '.JPG', '.jpeg', '.JPEG', '.cr2', '.CR2'):
                     shutil.move(os.path.join(self.mRootFolder, newImage), self.mActiveTakePath)
                     count = count + 1
             lFinished = 1

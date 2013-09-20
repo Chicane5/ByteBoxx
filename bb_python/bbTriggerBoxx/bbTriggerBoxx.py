@@ -8,6 +8,7 @@ import sys, os
 import datetime as date
 import serial
 import time
+import pickle
 #3rd
 from PyQt4 import QtCore, QtGui
 #user
@@ -19,6 +20,7 @@ from smartshooter.session import Session
 #globals
 gCONFIG_VAR = 'TRIGGERBOXX_CONFIG'
 gCONFIG_FILE = 'triggerboxx_defaults.txt'
+gSESSION_FILE = 'session.tbs'
 
 #===============================================================================
 # 
@@ -45,7 +47,8 @@ class DL_bbTriggerBoxxConfig(QtGui.QDialog, configuifile.Ui_Dialog_bbTriggerBoxx
         try:
             with open(os.path.join(os.environ.get(gCONFIG_VAR), gCONFIG_FILE), "w") as fh:
                 fh.writelines("photodir " + str(self.lineEdit_photoDownload.text()) + '\n')
-                fh.writelines("mirror " + str(self.checkBox_mirror.checkState()) + '\n')
+                fh.writelines("jpg " + str(self.checkBox_jpg.checkState()) + '\n')
+                fh.writelines("cr2 " + str(self.checkBox_cr2.checkState()) + '\n')
                 fh.writelines("focus " + str(self.doubleSpinBox_focus.value()) + '\n')
                 fh.writelines("flash " + str(self.doubleSpinBox_flash.value()) + '\n')
             
@@ -67,7 +70,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         styleFile=os.path.join(os.path.dirname(os.path.split(__file__)[0]),"common//qt", "DarkOrangeQStyleTemplate.txt")
         with open(styleFile,"r") as fh:
             self.setStyleSheet(fh.read())
-            
+                       
         #action connections
         self.connect(self.actionMesh, QtCore.SIGNAL("triggered()"), self.newSession)
         self.connect(self.actionTexture, QtCore.SIGNAL("triggered()"), self.newSession)
@@ -79,12 +82,18 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             lAction = self.__dict__['actionOpen_{0}'.format(x)]
             self.connect(lAction, QtCore.SIGNAL("triggered()"), self.openComms)
         
-        #edits
+        #edits/spinners/checks
         self.connect(self.lineEdit_pose, QtCore.SIGNAL("returnPressed()"), self.updatePose)
+        self.connect(self.spinBox_imgWait, QtCore.SIGNAL("valueChanged(int)"), self.updateInternalSleep)
+        self.connect(self.checkBox_jpg, QtCore.SIGNAL("stateChanged(int)"), self.calculateSleepDelay)
+        self.connect(self.checkBox_cr2, QtCore.SIGNAL("stateChanged(int)"), self.calculateSleepDelay)
         
         #main buttons
         self.connect(self.pushButton_fire, QtCore.SIGNAL("clicked()"), self.fireArray)
         self.connect(self.pushButton_prime, QtCore.SIGNAL("clicked()"), self.primeArray)
+        
+        #attrs
+        self.sleepDelay = 0
         
     def _main(self):
         self.show()
@@ -120,15 +129,29 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 lSplit = line.split(' ')
                 self.lineEdit_photoDownload.setText(lSplit[1].rstrip())
                 self.lineEdit_photoDownload.setReadOnly(True)
-            elif line.startswith('mirror'):
+            elif line.startswith('jpg'):
                 lSplit = line.split(' ')
-                self.checkBox_mirror.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip()))
+                self.checkBox_jpg.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip()))
+            elif line.startswith('cr2'):
+                lSplit = line.split(' ')
+                self.checkBox_cr2.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip()))
             elif line.startswith('focus'):
                 lSplit = line.split(' ')
                 self.doubleSpinBox_focus.setValue(float(lSplit[1].rstrip()))
             elif line.startswith('flash'):
                 lSplit = line.split(' ')
                 self.doubleSpinBox_flash.setValue(float(lSplit[1].rstrip()))
+                
+            self.calculateSleepDelay()
+            
+    def calculateSleepDelay(self):
+        if self.checkBox_jpg.isChecked() and self.checkBox_cr2.isChecked():
+            self.spinBox_imgWait.setValue(85)
+        elif self.checkBox_jpg.isChecked() and not self.checkBox_cr2.isChecked():
+            self.spinBox_imgWait.setValue(25)
+            
+    def updateInternalSleep(self, pValue):
+        self.sleepDelay = pValue
                 
     def populateSubjectFields(self):
         self.lineEdit_subject.setText(self.mSession.mSubjectName)
@@ -148,25 +171,35 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         lToday = date.datetime.today()
         lShootFolder = os.path.join(self.mSession.mRootFolder, lToday.strftime('%Y%m%d') + '_' + self.mSession.mType)
         
-        try:
-            if not os.path.exists(os.path.abspath(lShootFolder)):
-                os.makedirs(lShootFolder)
-                
-            #switch off
-            self.radioButton_mesh.setEnabled(False)
-            self.radioButton_texture.setEnabled(False)
-            
-            self.mSession.mShootFolder = lShootFolder
-            
-            #create default session
-            self.mSession.newSession()
+        #check for a previous session and try to load
+        lSessionFile = os.path.join(lShootFolder, gSESSION_FILE)
+        if os.path.isfile(lSessionFile):
+            with open(lSessionFile, 'r') as fh:
+                lPrevSession = pickle.load(fh)
+            self.mSession = lPrevSession
             self.populateSubjectFields()
-            
-            if not os.path.exists(os.path.abspath(self.mSession.mActivePath)):
-                os.makedirs(self.mSession.mActivePath)
-        except:
-            popup.Popup.warning(self, "Error creating shootday directory, check permission")
-            
+        else:
+            try:
+                if not os.path.exists(os.path.abspath(lShootFolder)):
+                    os.makedirs(lShootFolder)
+                    
+
+                
+                self.mSession.mShootFolder = lShootFolder
+                
+                #create default session
+                self.mSession.newSession()
+                self.populateSubjectFields()
+                
+                if not os.path.exists(os.path.abspath(self.mSession.mActivePath)):
+                    os.makedirs(self.mSession.mActivePath)
+            except:
+                popup.Popup.warning(self, "Error creating shootday directory, check permission")
+                
+        #switch off
+        self.radioButton_mesh.setEnabled(False)
+        self.radioButton_texture.setEnabled(False)    
+        
         self.populateTreeView()
         
     def newSubject(self):
@@ -218,7 +251,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
         #write to the arduino and prime the cams
         self.plainTextEdit_logging.setPlainText('priming cams...\n')
-        self.mSerial.write('a')
+        self.mSerial.write('b')
     
     def fireArray(self):
         try:
@@ -229,7 +262,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
         #write to the arduino and trigger the cams
         self.plainTextEdit_logging.setPlainText('firing cams...\n')
-        self.mSerial.write('b')
+        self.mSerial.write('a')
         
         #create the take folder
         lTakeFolder = str(self.spinBox_take.value()) if self.spinBox_take.value() > 9 else '0' + str(self.spinBox_take.value())
@@ -239,9 +272,11 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 os.makedirs(self.mSession.mActiveTakePath)
         except:
             popup.Popup.warning(self, "Error creating take directory, check permission")
-            
+        
+        #todo -- thread this
         #sleep to allow images to drop in?
-        time.sleep(8)
+        time.sleep(self.sleepDelay)
+        #todo --
         
         #cleanup the images
         lCount = self.mSession.moveImages()
@@ -250,6 +285,12 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         #increment take?
         if self.checkBox_inc.isChecked():
             self.spinBox_take.setValue(self.spinBox_take.value() + 1)
+            
+    def closeEvent(self, event):
+        #try and pickle the session for later
+        with open(os.path.join(self.mSession.mShootFolder, gSESSION_FILE), 'w') as fh:
+            pickle.dump(self.mSession, fh)
+            
         
 #------------------------------------------------------------------------------ 
 if __name__ == "__main__":
