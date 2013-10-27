@@ -182,9 +182,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             try:
                 if not os.path.exists(os.path.abspath(lShootFolder)):
                     os.makedirs(lShootFolder)
-                    
-
-                
                 self.mSession.mShootFolder = lShootFolder
                 
                 #create default session
