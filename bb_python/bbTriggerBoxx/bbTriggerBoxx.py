@@ -26,6 +26,9 @@ gSESSION_FILE = 'session.tbs'
 # 
 #===============================================================================
 class DL_bbTriggerBoxxConfig(QtGui.QDialog, configuifile.Ui_Dialog_bbTriggerBoxx_config):
+    '''
+    classdocs
+    '''
     def __init__(self, parent=None):
         super(DL_bbTriggerBoxxConfig, self).__init__(parent)
         self.setupUi(self)
@@ -63,6 +66,9 @@ class DL_bbTriggerBoxxConfig(QtGui.QDialog, configuifile.Ui_Dialog_bbTriggerBoxx
 # 
 #===============================================================================
 class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
+    '''
+    classdocs
+    '''
     def __init__(self, parent=None):
         super(MW_bbTriggerBoxx, self).__init__(parent)
         self.setupUi(self)

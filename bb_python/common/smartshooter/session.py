@@ -6,7 +6,45 @@ Created on 17 Sep 2013
 #builtins
 import shutil, os
 
+#globals
 
+#===============================================================================
+# 
+#===============================================================================
+class DataTake(object):
+    '''
+    classdoc
+    '''
+    def __init__(self, pPath):
+        self.mPath = pPath
+        
+    def BindXML(self):
+        '''
+        look for the existence of XML info
+        '''
+        self.mXML = None
+        for lContent in os.listdir(self.mPath):
+            root, ext = os.path.splitext(lContent)
+            if ext == '.xml':
+                self.mXML = os.path.join(str(self.mPath), lContent)
+                break
+        
+        
+#=======================================================================
+# 
+#=======================================================================
+class MeshTake(DataTake):
+    '''
+    classdocs
+    '''
+    def __init__(self, pPath):
+        super(MeshTake, self).__init__(pPath)
+    
+    def GenerateXML(self):
+        '''
+        dics
+        '''
+        
 #===============================================================================
 # 
 #===============================================================================
@@ -64,4 +102,7 @@ class Session(object):
                     count = count + 1
             lFinished = 1
         return count
+    
+    def GenerateXML(self):
+        pass
     
