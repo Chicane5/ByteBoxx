@@ -96,52 +96,55 @@ class MW_bbRenderBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbRenderBoxx):
         self.treeView_dataSets.setModel(self.model)
         self.treeView_dataSets.setRootIndex(root)
         
-    def AddQueue(self):
+    def CheckForModel(self):
         #have they even populated the treeview at this point?
         try:
             assert 'model' in self.__dict__
         except AssertionError:
             popup.Popup.warning(self, "Pick a session root directory first!")
-            return
+            return False
+        return True
         
-        #get the path from the tree view and ensure they are only trying to add take objects
-        lPath = self.ResolveTreeIndex()
-        if not os.path.basename(str(lPath)).startswith('tk'):
-            popup.Popup.warning(self, "Only take objects can be added to the process queue!")
-            return
-            
-        lProcTake = MeshTake(lPath)
-        lProcTake.BindXML() #check for XML and bind it
-        #save the take in the dict, reference it by path name
-        if not lPath in self.mProcessQueue.keys():
-            self.mProcessQueue[lPath] = lProcTake
-            self.listWidget_queue.addItem(lPath)
-        else:
-            popup.Popup.info(self, "This take is already in your queue!")
-            del(lProcTake)
+    def AddQueue(self):
+        if self.CheckForModel():
+            #get the path from the tree view and ensure they are only trying to add take objects
+            lPath = self.ResolveTreeIndex()
+            if not os.path.basename(str(lPath)).startswith('tk'):
+                popup.Popup.warning(self, "Only take objects can be added to the process queue!")
+                return
+                
+            lProcTake = MeshTake(lPath)
+            lProcTake.BindXML() #check for XML and bind it
+            #save the take in the dict, reference it by path name
+            if not lPath in self.mProcessQueue.keys():
+                self.mProcessQueue[lPath] = lProcTake
+                self.listWidget_queue.addItem(lPath)
+            else:
+                popup.Popup.info(self, "This take is already in your queue!")
+                del(lProcTake)
             
     def RemQueue(self):
-        #grab the text of the current selection in the queue list and pop it from the dict
-        lPath = self.listWidget_queue.currentItem().text()
-        self.mProcessQueue.pop(lPath)
-        self.listWidget_queue.takeItem(self.listWidget_queue.currentRow())
+        if self.CheckForModel():
+            #grab the text of the current selection in the queue list and pop it from the dict
+            lPath = self.listWidget_queue.currentItem().text()
+            self.mProcessQueue.pop(lPath)
+            self.listWidget_queue.takeItem(self.listWidget_queue.currentRow())
 
     def ResolveTreeIndex(self):
         indexItem = self.treeView_dataSets.currentIndex()
         return self.model.filePath(indexItem)
     
     def MoreInfo(self):
-        #parse the associated take XML to glean more info about the take
-        lPath = self.listWidget_queue.currentItem().text()
-        lXML = self.mProcessQueue[lPath].mXML
-        if not lXML:
-            popup.Popup.info(self, "This take has no bound XML info!")
-            return
-        
-        lInfoDlg = DL_bbRenderBoxxInfo(self)
-        lInfoDlg._main()
-        
-        
+        if self.CheckForModel():
+            #parse the associated take XML to glean more info about the take
+            lPath = self.listWidget_queue.currentItem().text()
+            lXML = self.mProcessQueue[lPath].mXML
+            if not lXML:
+                popup.Popup.info(self, "This take has no bound XML info!")
+                return
+            
+            lInfoDlg = DL_bbRenderBoxxInfo(self)
+            lInfoDlg._main()
         
     def GenerateBatch(self):
         if not self.mProcessQueue:

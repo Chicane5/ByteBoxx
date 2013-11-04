@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>598</width>
-    <height>543</height>
+    <width>637</width>
+    <height>548</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -142,17 +142,17 @@
        </widget>
       </item>
       <item>
-       <spacer name="horizontalSpacer">
-        <property name="orientation">
-         <enum>Qt::Horizontal</enum>
+       <widget class="QLabel" name="label_logo">
+        <property name="text">
+         <string/>
         </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>168</width>
-          <height>20</height>
-         </size>
+        <property name="pixmap">
+         <pixmap resource="bbRenderBoxx_QRC.qrc">:/icons/bbRenderBoxx_logo.jpg</pixmap>
         </property>
-       </spacer>
+        <property name="scaledContents">
+         <bool>false</bool>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
@@ -163,13 +163,51 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>598</width>
+     <width>637</width>
      <height>21</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuResource">
+    <property name="title">
+     <string>Resource</string>
+    </property>
+    <addaction name="actionNew_Resource_File"/>
+    <addaction name="actionLoad_Resource_File"/>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuAbout">
+    <property name="title">
+     <string>About</string>
+    </property>
+    <addaction name="actionRenderBoxx"/>
+   </widget>
+   <addaction name="menuResource"/>
+   <addaction name="menuHelp"/>
+   <addaction name="menuAbout"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionNew_Resource_File">
+   <property name="text">
+    <string>New Resource File</string>
+   </property>
+  </action>
+  <action name="actionLoad_Resource_File">
+   <property name="text">
+    <string>Load Resource File</string>
+   </property>
+  </action>
+  <action name="actionRenderBoxx">
+   <property name="text">
+    <string>RenderBoxx</string>
+   </property>
+  </action>
  </widget>
- <resources/>
+ <resources>
+  <include location="bbRenderBoxx_QRC.qrc"/>
+ </resources>
  <connections/>
 </ui>

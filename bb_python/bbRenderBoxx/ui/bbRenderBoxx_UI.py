@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bbRenderBoxx_UI.ui'
 #
-# Created: Sun Oct 27 14:34:03 2013
+# Created: Sun Nov 03 18:17:32 2013
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,7 +26,7 @@ except AttributeError:
 class Ui_MainWindow_bbRenderBoxx(object):
     def setupUi(self, MainWindow_bbRenderBoxx):
         MainWindow_bbRenderBoxx.setObjectName(_fromUtf8("MainWindow_bbRenderBoxx"))
-        MainWindow_bbRenderBoxx.resize(598, 543)
+        MainWindow_bbRenderBoxx.resize(637, 548)
         self.centralwidget = QtGui.QWidget(MainWindow_bbRenderBoxx)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
         self.verticalLayout_3 = QtGui.QVBoxLayout(self.centralwidget)
@@ -95,17 +95,39 @@ class Ui_MainWindow_bbRenderBoxx(object):
         self.pushButton_genBatch.setFont(font)
         self.pushButton_genBatch.setObjectName(_fromUtf8("pushButton_genBatch"))
         self.horizontalLayout.addWidget(self.pushButton_genBatch)
-        spacerItem = QtGui.QSpacerItem(168, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout.addItem(spacerItem)
+        self.label_logo = QtGui.QLabel(self.centralwidget)
+        self.label_logo.setText(_fromUtf8(""))
+        self.label_logo.setPixmap(QtGui.QPixmap(_fromUtf8(":/icons/bbRenderBoxx_logo.jpg")))
+        self.label_logo.setScaledContents(False)
+        self.label_logo.setObjectName(_fromUtf8("label_logo"))
+        self.horizontalLayout.addWidget(self.label_logo)
         self.verticalLayout_3.addLayout(self.horizontalLayout)
         MainWindow_bbRenderBoxx.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow_bbRenderBoxx)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 598, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 637, 21))
         self.menubar.setObjectName(_fromUtf8("menubar"))
+        self.menuResource = QtGui.QMenu(self.menubar)
+        self.menuResource.setObjectName(_fromUtf8("menuResource"))
+        self.menuHelp = QtGui.QMenu(self.menubar)
+        self.menuHelp.setObjectName(_fromUtf8("menuHelp"))
+        self.menuAbout = QtGui.QMenu(self.menubar)
+        self.menuAbout.setObjectName(_fromUtf8("menuAbout"))
         MainWindow_bbRenderBoxx.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow_bbRenderBoxx)
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
         MainWindow_bbRenderBoxx.setStatusBar(self.statusbar)
+        self.actionNew_Resource_File = QtGui.QAction(MainWindow_bbRenderBoxx)
+        self.actionNew_Resource_File.setObjectName(_fromUtf8("actionNew_Resource_File"))
+        self.actionLoad_Resource_File = QtGui.QAction(MainWindow_bbRenderBoxx)
+        self.actionLoad_Resource_File.setObjectName(_fromUtf8("actionLoad_Resource_File"))
+        self.actionRenderBoxx = QtGui.QAction(MainWindow_bbRenderBoxx)
+        self.actionRenderBoxx.setObjectName(_fromUtf8("actionRenderBoxx"))
+        self.menuResource.addAction(self.actionNew_Resource_File)
+        self.menuResource.addAction(self.actionLoad_Resource_File)
+        self.menuAbout.addAction(self.actionRenderBoxx)
+        self.menubar.addAction(self.menuResource.menuAction())
+        self.menubar.addAction(self.menuHelp.menuAction())
+        self.menubar.addAction(self.menuAbout.menuAction())
         self.label.setBuddy(self.lineEdit_session)
 
         self.retranslateUi(MainWindow_bbRenderBoxx)
@@ -121,4 +143,11 @@ class Ui_MainWindow_bbRenderBoxx(object):
         self.pushButton_remQueue.setText(_translate("MainWindow_bbRenderBoxx", "<- Queue", None))
         self.pushButton_info.setText(_translate("MainWindow_bbRenderBoxx", "More Info", None))
         self.pushButton_genBatch.setText(_translate("MainWindow_bbRenderBoxx", "Generate Batch...", None))
+        self.menuResource.setTitle(_translate("MainWindow_bbRenderBoxx", "Resource", None))
+        self.menuHelp.setTitle(_translate("MainWindow_bbRenderBoxx", "Help", None))
+        self.menuAbout.setTitle(_translate("MainWindow_bbRenderBoxx", "About", None))
+        self.actionNew_Resource_File.setText(_translate("MainWindow_bbRenderBoxx", "New Resource File", None))
+        self.actionLoad_Resource_File.setText(_translate("MainWindow_bbRenderBoxx", "Load Resource File", None))
+        self.actionRenderBoxx.setText(_translate("MainWindow_bbRenderBoxx", "RenderBoxx", None))
 
+import bbRenderBoxx_QRC_rc

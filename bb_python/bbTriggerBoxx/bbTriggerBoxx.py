@@ -21,13 +21,19 @@ from smartshooter.session import Session
 gCONFIG_VAR = 'TRIGGERBOXX_CONFIG'
 gCONFIG_FILE = 'triggerboxx_defaults.txt'
 gSESSION_FILE = 'session.tbs'
+gTAKEDIR_PREFIX = 'tk'
 
 #===============================================================================
 # 
 #===============================================================================
 class DL_bbTriggerBoxxConfig(QtGui.QDialog, configuifile.Ui_Dialog_bbTriggerBoxx_config):
     '''
-    classdocs
+    popup to write default values to disk for
+    PHOTODIR
+    JPG INCLUDE
+    CR2 INCLUDE
+    FOCUS TIME
+    FLASH TIME
     '''
     def __init__(self, parent=None):
         super(DL_bbTriggerBoxxConfig, self).__init__(parent)
@@ -62,17 +68,19 @@ class DL_bbTriggerBoxxConfig(QtGui.QDialog, configuifile.Ui_Dialog_bbTriggerBoxx
         except IOError:
             print "Error writing to file, check permissions"
             
+            
 #===============================================================================
 # 
 #===============================================================================
 class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
     '''
-    classdocs
+    TriggerBoxx main window class
     '''
     def __init__(self, parent=None):
         super(MW_bbTriggerBoxx, self).__init__(parent)
         self.setupUi(self)
         
+        #load the global ByteBoxx stylesheet
         styleFile=os.path.join(os.path.dirname(os.path.split(__file__)[0]),"common//qt", "DarkOrangeQStyleTemplate.txt")
         with open(styleFile,"r") as fh:
             self.setStyleSheet(fh.read())
@@ -99,12 +107,12 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.connect(self.pushButton_prime, QtCore.SIGNAL("clicked()"), self.primeArray)
         
         #attrs
-        self.sleepDelay = 0
+        self.sleepDelay = 0 #how long should we wait while the images are copied
         
     def _main(self):
         self.show()
         
-        #load a config file
+        #load/create a config file
         self.checkConfig()
 
     def checkConfig(self):
@@ -151,13 +159,14 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.calculateSleepDelay()
             
     def calculateSleepDelay(self):
+        #alter the internal sleep delay based on what image types we are shooting
         if self.checkBox_jpg.isChecked() and self.checkBox_cr2.isChecked():
             self.spinBox_imgWait.setValue(85)
         elif self.checkBox_jpg.isChecked() and not self.checkBox_cr2.isChecked():
             self.spinBox_imgWait.setValue(25)
             
     def updateInternalSleep(self, pValue):
-        self.sleepDelay = pValue
+        self.sleepDelay = pValue # update internal var
                 
     def populateSubjectFields(self):
         self.lineEdit_subject.setText(self.mSession.mSubjectName)
@@ -166,7 +175,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.lineEdit_pose.setText(self.mSession.mPose)
             
     def newSession(self):
-        #create a smartShooter session instance
+        #create a smartShooter session instance, either mesh or texture
         self.mSession = Session(str(self.sender().objectName()).lstrip('action'), str(self.lineEdit_photoDownload.text()))
         if self.mSession.mType == 'Mesh':
             self.radioButton_mesh.setChecked(True)
@@ -177,20 +186,23 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         lToday = date.datetime.today()
         lShootFolder = os.path.join(self.mSession.mRootFolder, lToday.strftime('%Y%m%d') + '_' + self.mSession.mType)
         
-        #check for a previous session and try to load
+        #check for a previous pickled session on disk and try to load
         lSessionFile = os.path.join(lShootFolder, gSESSION_FILE)
         if os.path.isfile(lSessionFile):
             with open(lSessionFile, 'r') as fh:
                 lPrevSession = pickle.load(fh)
             self.mSession = lPrevSession
-            self.populateSubjectFields()
+            self.populateSubjectFields() #write them to the GUI
+            #work out the take
+            lTakeFolder = os.path.basename(self.mSession.mActiveTakePath)
+            self.spinBox_take.setValue(int(lTakeFolder.lstrip('tk')) + 1)
         else:
             try:
                 if not os.path.exists(os.path.abspath(lShootFolder)):
                     os.makedirs(lShootFolder)
                 self.mSession.mShootFolder = lShootFolder
                 
-                #create default session
+                #create the default session if we didnt find a pickle
                 self.mSession.newSession()
                 self.populateSubjectFields()
                 
@@ -245,56 +257,67 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.treeView_diskMap.setModel(model)
         self.treeView_diskMap.setRootIndex(root)
         
-    def primeArray(self):
+    def CheckSerialComms(self):
         try:
-            assert(hasattr(self, 'mSerial'))
+            assert 'mSerial' in self.__dict__
         except AssertionError:
             popup.Popup.critical(self, "no serial port defined!")
-            return
+            return False
+    
+        return True
         
-        #write to the arduino and prime the cams
-        self.plainTextEdit_logging.setPlainText('priming cams...\n')
-        self.mSerial.write('b')
+    def primeArray(self):
+        if self.CheckSerialComms():
+            #write to the arduino and prime the cams
+            self.plainTextEdit_logging.setPlainText('priming cams...\n')
+            self.mSerial.write('b')
     
     def fireArray(self):
-        try:
-            assert(hasattr(self, 'mSerial'))
-        except AssertionError:
-            popup.Popup.critical(self, "no serial port defined!")
-            return
-        
-        #write to the arduino and trigger the cams
-        self.plainTextEdit_logging.setPlainText('firing cams...\n')
-        self.mSerial.write('a')
-        
-        #create the take folder
-        lTakeFolder = str(self.spinBox_take.value()) if self.spinBox_take.value() > 9 else '0' + str(self.spinBox_take.value())
-        self.mSession.mActiveTakePath = os.path.join(self.mSession.mActivePath, lTakeFolder)
-        try:
-            if not os.path.exists(os.path.abspath(self.mSession.mActiveTakePath)):
-                os.makedirs(self.mSession.mActiveTakePath)
-        except:
-            popup.Popup.warning(self, "Error creating take directory, check permission")
-        
-        #todo -- thread this
-        #sleep to allow images to drop in?
-        time.sleep(self.sleepDelay)
-        #todo --
-        
-        #cleanup the images
-        lCount = self.mSession.moveImages()
-        self.plainTextEdit_logging.appendPlainText('moved {0} images to {1}'.format(lCount, self.mSession.mActiveTakePath))
-        
-        #increment take?
-        if self.checkBox_inc.isChecked():
-            self.spinBox_take.setValue(self.spinBox_take.value() + 1)
+        if self.CheckSerialComms():
+            #write to the arduino and trigger the cams
+            self.plainTextEdit_logging.setPlainText('firing cams...\n')
+            self.mSerial.write('a')
+            
+            #create the take folder
+            lTakeFolder = gTAKEDIR_PREFIX + str(self.spinBox_take.value()) if self.spinBox_take.value() > 9 else gTAKEDIR_PREFIX + '0' + str(self.spinBox_take.value())
+            lActiveTakePath = os.path.join(self.mSession.mActivePath, lTakeFolder)
+            self.mSession.setActiveTakePath(lActiveTakePath)
+            #create on disk
+            try:
+                if not os.path.exists(os.path.abspath(self.mSession.mActiveTakePath)):
+                    os.makedirs(self.mSession.mActiveTakePath)
+                    
+                #make jpg and cr2 directories
+                if self.checkBox_jpg.isChecked():
+                    os.makedirs(os.path.join(self.mSession.mActiveTakePath, 'jpg'))
+                if self.checkBox_cr2.isChecked():
+                    os.makedirs(os.path.join(self.mSession.mActiveTakePath, 'cr2'))
+            except:
+                popup.Popup.warning(self, "Error creating take directory, check permission")
+            
+            #sleep to allow images to drop in?
+            time.sleep(self.sleepDelay)
+
+            #cleanup the images to the active take directory
+            lCount = self.mSession.moveImages()
+            self.plainTextEdit_logging.appendPlainText('moved {0} images to {1}'.format(lCount, self.mSession.mActiveTakePath))
+            
+            #write out the xml
+            if not self.mSession.GenerateXML(str(self.lineEdit_comment.text())):
+                popup.Popup.warning(self, "No JPGs were found - did camera array fire?")
+            
+            #increment take?
+            if self.checkBox_inc.isChecked():
+                self.spinBox_take.setValue(self.spinBox_take.value() + 1)
+                
+            self.lineEdit_comment.clear()
             
     def closeEvent(self, event):
         #try and pickle the session for later
         with open(os.path.join(self.mSession.mShootFolder, gSESSION_FILE), 'w') as fh:
             pickle.dump(self.mSession, fh)
             
-        
+            
 #------------------------------------------------------------------------------ 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
