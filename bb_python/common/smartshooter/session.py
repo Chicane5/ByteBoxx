@@ -5,11 +5,14 @@ Created on 17 Sep 2013
 '''
 #builtins
 import shutil, os
-import xml.etree.cElementTree as cetree
+import xml.etree.ElementTree
+import xml.etree.cElementTree as ET
 #3rd
 #user
 from image.meta import Meta
 from qt.popup import Popup
+from batch import batchtypes
+#globals
 
 
 #===============================================================================
@@ -19,8 +22,13 @@ class DataTake(object):
     '''
     describes a 'post' Session object to be passed into the render queue
     '''
+    cMESH_DATA = 'meshdata'
+    cTEX_DATA = 'texdata'
+    
     def __init__(self, pPath):
         self.mPath = pPath
+        self.mBatchJobs = []
+        self.mBatchVersions = {}
         
     def BindXML(self):
         '''
@@ -33,16 +41,61 @@ class DataTake(object):
                 self.mXML = os.path.join(str(self.mPath), lContent)
                 break
             
-              
+    def popBatchJobs(self):
+        self.mBatchJobs.append('tk')
+        
+    def updateBatchVersions(self):
+        '''
+        update dict to dynamically keep latest batch versions and their file path up to date
+        '''
+        if not self.mXML:
+            Popup.warning(self, "No bound XML! Cannot update batch versions for this take")
+            return
+        
+        lTree = ET.parse(self.mXML)
+        root = lTree.getroot()
+        
+        lBatchElem = None
+        for child in root:
+            if child.tag == 'batch':
+                lBatchElem = child
+                break
+                          
+        for lChildElem in lBatchElem:
+            self.mBatchVersions[lChildElem.tag] = [lChildElem.text, lChildElem.attrib['file']] if 'file' in lChildElem.attrib.keys() else [lChildElem.text]  
+            
+            
+            
 #=======================================================================
 # 
 #=======================================================================
 class MeshTake(DataTake):
     '''
-    mesh take object
+    mesh take object, specific to data being passed into photoscan
     '''
     def __init__(self, pPath):
         super(MeshTake, self).__init__(pPath)
+        self.mType = DataTake.cMESH_DATA
+        
+    def popBatchJobs(self):
+        super(MeshTake, self).popBatchJobs()
+        self.mBatchJobs.extend(batchtypes.gMESH_TASKS)
+             
+        
+#=======================================================================
+# 
+#=======================================================================
+class TextureTake(DataTake):
+    '''
+    texture ref take object, specific to data intended for a post texture pipe
+    '''
+    def __init__(self, pPath):
+        super(TextureTake, self).__init__(pPath)
+        self.mType = DataTake.cTEX_DATA
+        
+    def popBatchJobs(self):
+        super(TextureTake, self).popBatchJobs()
+        self.mBatchJobs.extend(batchtypes.gTEX_TASKS)
         
         
 #===============================================================================
@@ -52,8 +105,8 @@ class Session(object):
     '''
     describes a session - a container of an entire shootday of data.
     Sessions are created under the root folder and have a discreet type.
-    Only one session 'type' can be created for a shootday, with dynamic values
-    for active definition/poses etc.
+    Only one session 'type' can be created for a shootday. Dynamic member attributes
+    set current subject/character/definition/pose
     '''
     def __init__(self, pType, pRootFolder):
         self.mType = pType
@@ -145,16 +198,18 @@ class Session(object):
         if os.path.exists(os.path.abspath(os.path.join(self.mActiveTakePath, 'cr2'))):
             lCr2List = [c for c in os.listdir(os.path.join(self.mActiveTakePath, 'cr2'))]
                 
-        #assuming jpgs after this point
+        #assuming jpgs are alwasy shot after this point
         if not lJpgList:
             return False
         
         lJpgList.sort()
-        lTakeRootEl = cetree.Element("take")
-        lImagesEl = cetree.SubElement(lTakeRootEl, "images")
-        lJpgEl = cetree.SubElement(lImagesEl, "jpeg")
-        lCr2El = cetree.SubElement(lImagesEl, "cr2")
+        lTakeRootEl = ET.Element("take")
+        lImagesEl = ET.SubElement(lTakeRootEl, "images")
+        lJpgEl = ET.SubElement(lImagesEl, "jpeg")
+        lCr2El = ET.SubElement(lImagesEl, "cr2")
         lJpgEl.text = "1"
+        
+        #are there cr2s in addition to the jpegs
         if lCr2List:
             lCr2El.text = "1"
         else:
@@ -163,37 +218,41 @@ class Session(object):
         #exif stuff
         lMeta = Meta(os.path.join(self.mActiveTakePath,'jpg', lJpgList[0]), ['Exif.Photo.ExposureTime','Exif.Photo.FNumber','Exif.Photo.ColorSpace'])
         lMeta.GetAllMeta()
-        lExifEl = cetree.SubElement(lTakeRootEl, "exif")
-        lColourSpaceEl = cetree.SubElement(lExifEl, "colourspace")
-        lColourSpaceEl.text = lMeta.mValDict['Exif.Photo.ColorSpace']
+        lExifEl = ET.SubElement(lTakeRootEl, "exif")
+        lColourSpaceEl = ET.SubElement(lExifEl, "colourspace")
+        if lMeta.mValDict['Exif.Photo.ColorSpace'] == '1':
+            lColourSpaceEl.text = 'sRGB'
+        else:
+            lColourSpaceEl.text = lMeta.mValDict['Exif.Photo.ColorSpace']
         
-        lFNumberEl = cetree.SubElement(lExifEl, "fnumber")
+        lFNumberEl = ET.SubElement(lExifEl, "fnumber")
         lFNumberEl.text = lMeta.mValDict['Exif.Photo.FNumber']
         
-        lShutterEl = cetree.SubElement(lExifEl, "exposuretime")
+        lShutterEl = ET.SubElement(lExifEl, "exposuretime")
         lShutterEl.text = lMeta.mValDict['Exif.Photo.ExposureTime']
         
-        lCommentEl = cetree.SubElement(lTakeRootEl, "comment")
+        #extra
+        lExtraEl = ET.SubElement(lTakeRootEl, "extra")
+        lCommentEl = ET.SubElement(lExtraEl, "comment")
         if pCommentStr == "":
             lCommentEl.text = "empty"
         else:
             lCommentEl.text = pCommentStr
         
-        #batch stuff
-        lBatchEl = cetree.SubElement(lTakeRootEl, "batch")
-        lMaskEl = cetree.SubElement(lBatchEl, "automask")
-        lAlignEl = cetree.SubElement(lBatchEl, "align")
-        lGeoEl = cetree.SubElement(lBatchEl, "geobuild")
-        lDecEl = cetree.SubElement(lBatchEl, "decimate")
-        lTexEl = cetree.SubElement(lBatchEl, "texturebake")
-        lMdlExpEl = cetree.SubElement(lBatchEl, "modelexport")
-        lClientEl = cetree.SubElement(lBatchEl, "clientpackage")
-        lRenderEl = cetree.SubElement(lBatchEl, "render")
+        #batch stuff - will differ for session types
+        lBatchEl = ET.SubElement(lTakeRootEl, "batch")
         
-        for element in [lMaskEl, lAlignEl, lGeoEl, lDecEl, lTexEl, lMdlExpEl, lClientEl, lRenderEl]:
-            element.text = "0" 
+        if self.mType == 'Mesh':
+            for task in batchtypes.gMESH_TASKS:
+                lTaskEl = ET.SubElement(lBatchEl, task)
+                lTaskEl.text = "v0"
+          
+        elif self.mType == 'Texture':
+            for task in batchtypes.gTEX_TASKS:
+                lTaskEl = ET.SubElement(lBatchEl, task)
+                lTaskEl.text = "v0"
         
-        tree = cetree.ElementTree(lTakeRootEl)
+        tree = ET.ElementTree(lTakeRootEl)
         tree.write(os.path.join(self.mActiveTakePath, 'bb_takeInfo.xml'))
         
         return True

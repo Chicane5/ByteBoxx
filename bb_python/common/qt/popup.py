@@ -9,7 +9,7 @@ from PyQt4 import QtCore, QtGui
 #===============================================================================
 # 
 #===============================================================================
-class Popup():
+class Popup(object):
     '''
     BB wrapper for QtMessageBox static methods
     '''
@@ -32,7 +32,7 @@ class Popup():
 #===============================================================================
 # 
 #===============================================================================
-class FileDialog():
+class FileDialog(object):
     '''
     BB wrapper for QtMessageBox static methods
     '''
@@ -51,7 +51,7 @@ class FileDialog():
 #===============================================================================
 # 
 #===============================================================================
-class Input():
+class Input(object):
     '''
     BB wrapper for QtInputBox static methods
     '''

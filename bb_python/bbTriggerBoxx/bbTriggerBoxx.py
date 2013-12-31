@@ -16,6 +16,7 @@ from ui import bbTriggerBoxx_UI as uifile
 from ui import bbTriggerBoxx_config_UI as configuifile
 from qt import popup
 from smartshooter.session import Session
+from app import makepy2exe
 
 #globals
 gCONFIG_VAR = 'TRIGGERBOXX_CONFIG'
@@ -80,10 +81,12 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         super(MW_bbTriggerBoxx, self).__init__(parent)
         self.setupUi(self)
         
-        #load the global ByteBoxx stylesheet
-        styleFile=os.path.join(os.path.dirname(os.path.split(__file__)[0]),"common//qt", "DarkOrangeQStyleTemplate.txt")
-        with open(styleFile,"r") as fh:
-            self.setStyleSheet(fh.read())
+        #load the global ByteBoxx stylesheet - check if we are frozen
+        lCurrentDir = makepy2exe.get_main_dir()
+        if lCurrentDir:
+            styleFile=os.path.join(lCurrentDir, "DarkOrangeQStyleTemplate.txt")
+            with open(styleFile,"r") as fh:
+                self.setStyleSheet(fh.read())
                        
         #action connections
         self.connect(self.actionMesh, QtCore.SIGNAL("triggered()"), self.newSession)
