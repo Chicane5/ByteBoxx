@@ -23,12 +23,18 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
     '''
     classdocs
     '''
+    cROW_HEIGHT = 38
+    cLINE_EDIT_MIN_WIDTH = 120
+    
     def __init__(self,parent=None):
         super(DL_bbRenderBoxxQueue, self).__init__(parent)
         self.setupUi(self)
         self.mTakeList = []
+        #self.mBtnList = []
         
         #connections
+        self.connect(self.pushButton_moveUp, QtCore.SIGNAL("clicked()"), self._getFile)
+        self.connect(self.tableWidget_queue, QtCore.SIGNAL("cellActivated(int,int"), self._expand)
         
         
     def _main(self, pTakeList):
@@ -57,6 +63,7 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
         self.tableWidget_queue.setHorizontalHeaderLabels(lPlusBatchTk.mBatchJobs)
         
         for lTkRow in range(len(self.mTakeList)):
+            #set the default 'tk' column
             item = QtGui.QTableWidgetItem()
             item.setText(self.mTakeList[lTkRow].mPath)
             self.tableWidget_queue.setItem(lTkRow,0, item)
@@ -64,16 +71,50 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
             for index,value in enumerate(self.mTakeList[lTkRow].mBatchJobs):
                 if value == 'tk': #default, ignore
                     continue
+                
+                #do all the widget stuff :/
+                lWidgetNew = QtGui.QWidget()
+                lHLayout = QtGui.QHBoxLayout()
+                #-
                 lCheckNew = QtGui.QCheckBox()
-                lFieldNew = QtGui.QLineEdit()
                 lCheckNew.setText(self.mTakeList[lTkRow].mBatchVersions[value][0]) #pull the current version from the take's dictionary
-                self.tableWidget_queue.setCellWidget(lTkRow,index,lCheckNew)
-                self.tableWidget_queue.setCellWidget(lTkRow,index,lFieldNew)
+                lFieldNew = QtGui.QLineEdit()
+                try:
+                    lFieldNew.setText(self.mTakeList[lTkRow].mBatchVersions[value][1])
+                except IndexError:
+                    lFieldNew.setText("no file")
+                lFieldNew.setMinimumWidth(DL_bbRenderBoxxQueue.cLINE_EDIT_MIN_WIDTH)
+                lButBseNew = QtGui.QPushButton()
+                lButBseNew.setText("look")
+                self.connect(lButBseNew, QtCore.SIGNAL("clicked()"), self._getFile)
+                #self.mBtnList.append(lButBseNew)
+                lButNew = QtGui.QPushButton()
+                lButNew.setText("params")
+                #-
+                lHLayout.addWidget(lCheckNew)
+                lHLayout.addWidget(lFieldNew)
+                lHLayout.addWidget(lButBseNew)
+                lHLayout.addWidget(lButNew)
+                lWidgetNew.setLayout(lHLayout)
+                
+                self.tableWidget_queue.setCellWidget(lTkRow,index,lWidgetNew)
+                self.tableWidget_queue.setRowHeight(lTkRow, DL_bbRenderBoxxQueue.cROW_HEIGHT)
+                
         
         
         
     def _addCmd(self, pCmdStr):
         pass
+    
+    def _getFile(self):
+        #print self.sender()
+        lDir = popup.FileDialog.getDirectory(self, "pick a version directory")
+        if lDir:
+            self.sender().parentWidget().layout().itemAt(1).widget().setText(lDir) #edit field
+        
+    def _expand(self, pRow, pColumn):
+        print "wanker"
+    
 
 #===============================================================================
 # 
@@ -171,7 +212,9 @@ class MW_bbRenderBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbRenderBoxx):
             #get the path from the tree view and ensure they are only trying to add take objects
             lPath = self.ResolveTreeIndex()
             if not os.path.basename(str(lPath)).startswith('tk'):
-                popup.Popup.warning(self, "Only take objects can be added to the process queue!")
+                #popup.Popup.warning(self, "Only take objects can be added to the process queue!")
+                ltest = popup.Popup.question(self, "this directory doesn't appear to be a standard take dir.\nAdd this directory anyway?")
+                print ltest
                 return
                 
             #what take type are we dealing with

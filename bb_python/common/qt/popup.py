@@ -27,7 +27,7 @@ class Popup(object):
         
     @staticmethod
     def question(pParent, pText):
-        QtGui.QMessageBox.question(pParent, "ByteBoxx Question", QtCore.QString(pText))
+        return QtGui.QMessageBox.question(pParent, "ByteBoxx Question", QtCore.QString(pText))
         
 #===============================================================================
 # 

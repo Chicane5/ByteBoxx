@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bbRenderBoxx_queue_UI.ui'
 #
-# Created: Sun Nov 03 18:16:25 2013
+# Created: Thu Jan 02 03:27:29 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,7 +26,7 @@ except AttributeError:
 class Ui_Dialog_bbRenderBoxx_queue(object):
     def setupUi(self, Dialog_bbRenderBoxx_queue):
         Dialog_bbRenderBoxx_queue.setObjectName(_fromUtf8("Dialog_bbRenderBoxx_queue"))
-        Dialog_bbRenderBoxx_queue.resize(606, 469)
+        Dialog_bbRenderBoxx_queue.resize(652, 549)
         self.verticalLayout_6 = QtGui.QVBoxLayout(Dialog_bbRenderBoxx_queue)
         self.verticalLayout_6.setObjectName(_fromUtf8("verticalLayout_6"))
         self.tabWidget = QtGui.QTabWidget(Dialog_bbRenderBoxx_queue)
@@ -76,6 +76,9 @@ class Ui_Dialog_bbRenderBoxx_queue(object):
         self.pushButton_moveDown = QtGui.QPushButton(self.frame)
         self.pushButton_moveDown.setObjectName(_fromUtf8("pushButton_moveDown"))
         self.horizontalLayout.addWidget(self.pushButton_moveDown)
+        self.pushButton_addCmd = QtGui.QPushButton(self.frame)
+        self.pushButton_addCmd.setObjectName(_fromUtf8("pushButton_addCmd"))
+        self.horizontalLayout.addWidget(self.pushButton_addCmd)
         self.pushButton = QtGui.QPushButton(self.frame)
         font = QtGui.QFont()
         font.setPointSize(10)
@@ -134,6 +137,7 @@ class Ui_Dialog_bbRenderBoxx_queue(object):
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_res), _translate("Dialog_bbRenderBoxx_queue", "Resources", None))
         self.pushButton_moveUp.setText(_translate("Dialog_bbRenderBoxx_queue", "Move Up", None))
         self.pushButton_moveDown.setText(_translate("Dialog_bbRenderBoxx_queue", "Move Down", None))
+        self.pushButton_addCmd.setText(_translate("Dialog_bbRenderBoxx_queue", "Add Cmd Task", None))
         self.pushButton.setText(_translate("Dialog_bbRenderBoxx_queue", "Render Queue", None))
         self.checkBox_notifyTask.setText(_translate("Dialog_bbRenderBoxx_queue", "Notify on Task", None))
         self.checkBox_notifyJob.setText(_translate("Dialog_bbRenderBoxx_queue", "Notify on Job", None))

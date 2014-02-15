@@ -40,8 +40,14 @@ class DataTake(object):
             if ext == '.xml':
                 self.mXML = os.path.join(str(self.mPath), lContent)
                 break
+        if not self.mXML:
+            twat = Popup.question(None, "create XML?")
+            print twat
             
     def popBatchJobs(self):
+        '''
+        populate default batch job to appear in queue window
+        '''
         self.mBatchJobs.append('tk')
         
     def updateBatchVersions(self):
@@ -78,6 +84,9 @@ class MeshTake(DataTake):
         self.mType = DataTake.cMESH_DATA
         
     def popBatchJobs(self):
+        '''
+        populate batch jobs specific to mesh processing
+        '''
         super(MeshTake, self).popBatchJobs()
         self.mBatchJobs.extend(batchtypes.gMESH_TASKS)
              
@@ -94,6 +103,9 @@ class TextureTake(DataTake):
         self.mType = DataTake.cTEX_DATA
         
     def popBatchJobs(self):
+        '''
+        populate batch jobs specific to texture processing
+        '''
         super(TextureTake, self).popBatchJobs()
         self.mBatchJobs.extend(batchtypes.gTEX_TASKS)
         
