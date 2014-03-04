@@ -122,59 +122,19 @@ class Session(object):
     '''
     def __init__(self, pType, pRootFolder):
         self.mType = pType
-        self.mRootFolder = pRootFolder
-        self.mShootFolder = ''
-        self.mSubjectName = ''
-        self.mCharacterName = ''
-        self.mDefinition = ''
-        self.mPose = ''
+        self.mRootFolder = pRootFolder #i.e Z:\\
+        self.mShootFolder = '' #the user defined shoot directory "*_mesh", "*_texture"
         self.mActivePath = ''
         self.mActiveTakePath = ''
         
     def newSession(self):
-        '''
-        sets all the relevant parameters for a new session
-        or when a pickled session is loaded from disk
-        '''
-        self.newSubject()
-        self.updateCharacter()
-        self.updateDefinition()
-        self.updatePose()
-        self.updateActivePath()
-    
-    def newSubject(self, name='testSubject'):
-        '''
-        create a new subject under this session
-        '''
-        self.mSubjectName = name
-    
-    def updateCharacter(self, name='testCharacter'):
-        '''
-        update the 'character' this subject is performing
-        '''
-        self.mCharacterName = name
-    
-    def updateDefinition(self, name='default'):
-        '''
-        update the definition
-        '''
-        self.mDefinition = name
-    
-    def updatePose(self, name='pose01'):
-        '''
-        update the pose
-        '''
-        self.mPose = name
-    
-    def updateActivePath(self):
+        pass
+
+    def updateActivePath(self, basePath):
         '''
         builds the whole path to the POSE
         '''
-        self.mActivePath = os.path.join(self.mShootFolder,
-                                        self.mSubjectName,
-                                        self.mCharacterName,
-                                        self.mDefinition,
-                                        self.mPose)
+        self.mActivePath = os.path.join(self.mShootFolder, basePath)
         
     def setActiveTakePath(self, pPath):
         self.mActiveTakePath = pPath
@@ -268,4 +228,76 @@ class Session(object):
         tree.write(os.path.join(self.mActiveTakePath, 'bb_takeInfo.xml'))
         
         return True
+    
+#===============================================================================
+# 
+#===============================================================================
+class SetSession(Session):
+    
+    def __init__(self, *args):
+        super(SetSession, self).__init__(*args)
+        self.mSubjectName = ''
+        self.mCharacterName = ''
+        self.mDefinition = ''
+        self.mPose = ''
+    
+    def newSession(self):
+        '''
+        sets all the relevant parameters for a new session
+        or when a pickled session is loaded from disk
+        '''
+        self.newSubject()
+        self.updateCharacter()
+        self.updateDefinition()
+        self.updatePose()
+        super(SetSession, self).updateActivePath(os.path.join(self.mSubjectName, self.mCharacterName, self.mDefinition, self.mPose))
+
+    def newSubject(self, name='testSubject'):
+        '''
+        create a new subject under this session
+        '''
+        self.mSubjectName = name
+    
+    def updateCharacter(self, name='testCharacter'):
+        '''
+        update the 'character' this subject is performing
+        '''
+        self.mCharacterName = name
+    
+    def updateDefinition(self, name='default'):
+        '''
+        update the definition
+        '''
+        self.mDefinition = name
+    
+    def updatePose(self, name='pose01'):
+        '''
+        update the pose
+        '''
+        self.mPose = name
+        
+    def updateActivePath(self):
+        super(SetSession, self).updateActivePath(os.path.join(self.mSubjectName, self.mCharacterName, self.mDefinition, self.mPose))
+
+#===============================================================================
+# 
+#===============================================================================
+class FlexSession(Session):
+    
+    def __init__(self, *args):
+        super(FlexSession, self).__init__(*args)
+        self.mBucket = ''
+
+    def newSession(self):
+        self.updateBucket()
+        super(FlexSession, self).updateActivePath(self.mBucket)
+    
+    def updateBucket(self, name='bucket01'):
+        '''
+        update the bucket
+        '''
+        self.mBucket = name
+        
+    def updateActivePath(self):
+        super(FlexSession, self).updateActivePath(self.mBucket)
     

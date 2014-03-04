@@ -15,7 +15,7 @@ from PyQt4 import QtCore, QtGui
 from ui import bbTriggerBoxx_UI as uifile
 from ui import bbTriggerBoxx_config_UI as configuifile
 from qt import popup
-from smartshooter.session import Session
+from smartshooter.session import SetSession, FlexSession
 from app import makepy2exe
 
 #globals
@@ -94,6 +94,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.connect(self.actionNew_Subject, QtCore.SIGNAL("triggered()"), self.newSubject)
         self.connect(self.actionNew_Character, QtCore.SIGNAL("triggered()"), self.newCharacter)
         self.connect(self.actionNew_Definition, QtCore.SIGNAL("triggered()"), self.newDefinition)
+        self.connect(self.actionEdit_Prefs, QtCore.SIGNAL("triggered()"), self.editPrefs)
         
         for x in ['COM1', 'COM3', 'COM4']:
             lAction = self.__dict__['actionOpen_{0}'.format(x)]
@@ -101,16 +102,21 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
         #edits/spinners/checks
         self.connect(self.lineEdit_pose, QtCore.SIGNAL("returnPressed()"), self.updatePose)
-        self.connect(self.spinBox_imgWait, QtCore.SIGNAL("valueChanged(int)"), self.updateInternalSleep)
-        self.connect(self.checkBox_jpg, QtCore.SIGNAL("stateChanged(int)"), self.calculateSleepDelay)
-        self.connect(self.checkBox_cr2, QtCore.SIGNAL("stateChanged(int)"), self.calculateSleepDelay)
+        self.connect(self.lineEdit_bucket, QtCore.SIGNAL("returnPressed()"), self.updateBucket)
+        
+        #self.connect(self.spinBox_imgWait, QtCore.SIGNAL("valueChanged(int)"), self.updateInternalSleep) DEPR
+        #self.connect(self.checkBox_jpg, QtCore.SIGNAL("stateChanged(int)"), self.calculateSleepDelay) DEPR
+        #self.connect(self.checkBox_cr2, QtCore.SIGNAL("stateChanged(int)"), self.calculateSleepDelay) DEPR
         
         #main buttons
         self.connect(self.pushButton_fire, QtCore.SIGNAL("clicked()"), self.fireArray)
         self.connect(self.pushButton_prime, QtCore.SIGNAL("clicked()"), self.primeArray)
         
         #attrs
-        self.sleepDelay = 0 #how long should we wait while the images are copied
+        #self.sleepDelay = 0 #how long should we wait while the images are copied
+        self.mWatcher = QtCore.QFileSystemWatcher(self)
+        self.connect(self.mWatcher, QtCore.SIGNAL("directoryChanged(QString)"), self.photoBucketChanged)
+        self.mCount = 0
         
     def _main(self):
         self.show()
@@ -133,6 +139,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 lConfigurator = DL_bbTriggerBoxxConfig(self)
                 lConfigurator._main()
                 
+    def editPrefs(self):
+        lConfigurator = DL_bbTriggerBoxxConfig(self)
+        lConfigurator._main()
+                
     def openComms(self):
         try:
             self.mSerial = serial.Serial(str(self.sender().objectName()).lstrip('actionOpen_'), 9600)   # open serial port that Arduino is using
@@ -148,10 +158,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 self.lineEdit_photoDownload.setReadOnly(True)
             elif line.startswith('jpg'):
                 lSplit = line.split(' ')
-                self.checkBox_jpg.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip()))
+                #self.checkBox_jpg.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip())) DEPR
             elif line.startswith('cr2'):
                 lSplit = line.split(' ')
-                self.checkBox_cr2.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip()))
+                #self.checkBox_cr2.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip())) DEPR
             elif line.startswith('focus'):
                 lSplit = line.split(' ')
                 self.doubleSpinBox_focus.setValue(float(lSplit[1].rstrip()))
@@ -159,35 +169,36 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 lSplit = line.split(' ')
                 self.doubleSpinBox_flash.setValue(float(lSplit[1].rstrip()))
                 
-            self.calculateSleepDelay()
             
-    def calculateSleepDelay(self):
-        #alter the internal sleep delay based on what image types we are shooting
-        if self.checkBox_jpg.isChecked() and self.checkBox_cr2.isChecked():
-            self.spinBox_imgWait.setValue(85)
-        elif self.checkBox_jpg.isChecked() and not self.checkBox_cr2.isChecked():
-            self.spinBox_imgWait.setValue(25)
-            
-    def updateInternalSleep(self, pValue):
-        self.sleepDelay = pValue # update internal var
-                
-    def populateSubjectFields(self):
-        self.lineEdit_subject.setText(self.mSession.mSubjectName)
-        self.lineEdit_character.setText(self.mSession.mCharacterName)
-        self.lineEdit_definition.setText(self.mSession.mDefinition)
-        self.lineEdit_pose.setText(self.mSession.mPose)
+
+    def populateFields(self):
+        if self.mSession.__class__ == FlexSession:
+            self.lineEdit_bucket.setText(self.mSession.mBucket)
+        elif self.mSession.__class__ == SetSession:
+            self.lineEdit_subject.setText(self.mSession.mSubjectName)
+            self.lineEdit_character.setText(self.mSession.mCharacterName)
+            self.lineEdit_definition.setText(self.mSession.mDefinition)
+            self.lineEdit_pose.setText(self.mSession.mPose)
             
     def newSession(self):
-        #create a smartShooter session instance, either mesh or texture
-        self.mSession = Session(str(self.sender().objectName()).lstrip('action'), str(self.lineEdit_photoDownload.text()))
+        #create a smartShooter session instance, either mesh or texture, flex or Set
+        if self.groupBox_setcap.isChecked() and self.groupBox_flexcap.isChecked():
+            popup.Popup.warning(self, "Cant run a 'Set' and 'Flex' Session at once!")
+            return
+        elif self.groupBox_setcap.isChecked():
+            self.mSession = SetSession(str(self.sender().objectName()).lstrip('action'), str(self.lineEdit_photoDownload.text()))
+        elif self.groupBox_flexcap.isChecked():
+            self.mSession = FlexSession(str(self.sender().objectName()).lstrip('action'), str(self.lineEdit_photoDownload.text()))
+            
         if self.mSession.mType == 'Mesh':
             self.radioButton_mesh.setChecked(True)
         elif self.mSession.mType == 'Texture':
             self.radioButton_texture.setChecked(True)
             
-        #create the root dir
-        lToday = date.datetime.today()
-        lShootFolder = os.path.join(self.mSession.mRootFolder, lToday.strftime('%Y%m%d') + '_' + self.mSession.mType)
+        #create the shoot folder dir
+        lFolderName = str(popup.Input.getText(self, "Enter Root Shoot Folder Name")[0])
+        lShootFolder = os.path.join(self.mSession.mRootFolder, lFolderName + '_' + self.mSession.mType)
+        
         
         #check for a previous pickled session on disk and try to load
         lSessionFile = os.path.join(lShootFolder, gSESSION_FILE)
@@ -195,30 +206,31 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             with open(lSessionFile, 'r') as fh:
                 lPrevSession = pickle.load(fh)
             self.mSession = lPrevSession
-            self.populateSubjectFields() #write them to the GUI
+            
+            #---CHANGE---
+            self.populateFields() #write them to the GUI
             #work out the take
             lTakeFolder = os.path.basename(self.mSession.mActiveTakePath)
             self.spinBox_take.setValue(int(lTakeFolder.lstrip('tk')) + 1)
         else:
-            try:
-                if not os.path.exists(os.path.abspath(lShootFolder)):
-                    os.makedirs(lShootFolder)
-                self.mSession.mShootFolder = lShootFolder
-                
-                #create the default session if we didnt find a pickle
-                self.mSession.newSession()
-                self.populateSubjectFields()
-                
-                if not os.path.exists(os.path.abspath(self.mSession.mActivePath)):
-                    os.makedirs(self.mSession.mActivePath)
-            except:
-                popup.Popup.warning(self, "Error creating shootday directory, check permission")
-                
+
+            if not os.path.exists(os.path.abspath(lShootFolder)):
+                os.makedirs(lShootFolder)
+            self.mSession.mShootFolder = lShootFolder
+            
+            #create the default session if we didnt find a pickle - CHANGE?
+            self.mSession.newSession()
+            self.populateFields()
+            
+            if not os.path.exists(os.path.abspath(self.mSession.mActivePath)):
+                os.makedirs(self.mSession.mActivePath)
+        
         #switch off
         self.radioButton_mesh.setEnabled(False)
         self.radioButton_texture.setEnabled(False)    
         
         self.populateTreeView()
+        self.mWatcher.addPath(QtCore.QString(self.mSession.mRootFolder)) # smartshooter dump folder to watch
         
     def newSubject(self):
         lNewSubjName = popup.Input.getText(self, "Enter new Subject name")
@@ -253,6 +265,13 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.spinBox_take.setValue(1)
         self.plainTextEdit_logging.setPlainText("Set new pose name to {0}".format(self.mSession.mPose))
         
+    def updateBucket(self):
+        self.mSession.updateBucket(name=str(self.lineEdit_bucket.text()))
+        self.mSession.updateActivePath()
+        #reset the takes
+        self.spinBox_take.setValue(1)
+        self.plainTextEdit_logging.setPlainText("Set new bucket name to {0}".format(self.mSession.mBucket))
+        
     def populateTreeView(self):
         model = QtGui.QFileSystemModel(self.treeView_diskMap)
         model.setReadOnly(True)
@@ -271,17 +290,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
     def primeArray(self):
         if self.CheckSerialComms():
-            #write to the arduino and prime the cams
-            self.plainTextEdit_logging.setPlainText('priming cams...\n')
-            self.mSerial.write('b')
-    
-    def fireArray(self):
-        if self.CheckSerialComms():
-            #write to the arduino and trigger the cams
-            self.plainTextEdit_logging.setPlainText('firing cams...\n')
-            self.mSerial.write('a')
-            
-            #create the take folder
+            #create the take folders
             lTakeFolder = gTAKEDIR_PREFIX + str(self.spinBox_take.value()) if self.spinBox_take.value() > 9 else gTAKEDIR_PREFIX + '0' + str(self.spinBox_take.value())
             lActiveTakePath = os.path.join(self.mSession.mActivePath, lTakeFolder)
             self.mSession.setActiveTakePath(lActiveTakePath)
@@ -297,13 +306,23 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                     os.makedirs(os.path.join(self.mSession.mActiveTakePath, 'cr2'))
             except:
                 popup.Popup.warning(self, "Error creating take directory, check permission")
+                
+            #write to the arduino
+            self.plainTextEdit_logging.setPlainText('take directories created, priming cams...\n')
+            self.mSerial.write('b')
+    
+    def fireArray(self):
+        if self.CheckSerialComms():
+            self.plainTextEdit_logging.clear()
+            #write to the arduino
+            self.mSerial.write('a')
             
             #sleep to allow images to drop in?
-            time.sleep(self.sleepDelay)
+            #time.sleep(self.sleepDelay)
 
             #cleanup the images to the active take directory
-            lCount = self.mSession.moveImages()
-            self.plainTextEdit_logging.appendPlainText('moved {0} images to {1}'.format(lCount, self.mSession.mActiveTakePath))
+            #lCount = self.mSession.moveImages()
+            #self.plainTextEdit_logging.appendPlainText('moved {0} images to {1}'.format(lCount, self.mSession.mActiveTakePath))
             
             #write out the xml
             if not self.mSession.GenerateXML(str(self.lineEdit_comment.text())):
@@ -315,11 +334,21 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 
             self.lineEdit_comment.clear()
             
+    def photoBucketChanged(self, pString):
+        '''
+        this will get called every time the shotbucket is updated
+        '''
+        print pString
+        if self.mCount == 0:
+             
+        self.mCount +=1
+            
     def closeEvent(self, event):
         #try and pickle the session for later
         with open(os.path.join(self.mSession.mShootFolder, gSESSION_FILE), 'w') as fh:
             pickle.dump(self.mSession, fh)
             
+        print self.mCount
             
 #------------------------------------------------------------------------------ 
 if __name__ == "__main__":
