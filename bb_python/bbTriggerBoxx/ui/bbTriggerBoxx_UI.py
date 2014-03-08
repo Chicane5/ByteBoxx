@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bbTriggerBoxx_UI.ui'
 #
-# Created: Mon Mar 03 20:17:35 2014
+# Created: Thu Mar 06 21:48:41 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -249,6 +249,8 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.menuActive_Subject.setObjectName(_fromUtf8("menuActive_Subject"))
         self.menuHelp = QtGui.QMenu(self.menubar)
         self.menuHelp.setObjectName(_fromUtf8("menuHelp"))
+        self.menuMonitor = QtGui.QMenu(self.menubar)
+        self.menuMonitor.setObjectName(_fromUtf8("menuMonitor"))
         MainWindow_bbTriggerBoxx.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow_bbTriggerBoxx)
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
@@ -279,6 +281,8 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.actionNew_Definition.setObjectName(_fromUtf8("actionNew_Definition"))
         self.actionEdit_Prefs = QtGui.QAction(MainWindow_bbTriggerBoxx)
         self.actionEdit_Prefs.setObjectName(_fromUtf8("actionEdit_Prefs"))
+        self.actionStart_Monitor = QtGui.QAction(MainWindow_bbTriggerBoxx)
+        self.actionStart_Monitor.setObjectName(_fromUtf8("actionStart_Monitor"))
         self.menuNew_Session.addAction(self.actionMesh)
         self.menuNew_Session.addAction(self.actionTexture)
         self.menuFile.addAction(self.menuNew_Session.menuAction())
@@ -291,9 +295,11 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.menuActive_Subject.addAction(self.actionNew_Definition)
         self.menuSubject.addAction(self.actionNew_Subject)
         self.menuSubject.addAction(self.menuActive_Subject.menuAction())
+        self.menuMonitor.addAction(self.actionStart_Monitor)
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuComms.menuAction())
         self.menubar.addAction(self.menuSubject.menuAction())
+        self.menubar.addAction(self.menuMonitor.menuAction())
         self.menubar.addAction(self.menuHelp.menuAction())
         self.menubar.addAction(self.menuAbout.menuAction())
         self.label.setBuddy(self.lineEdit_subject)
@@ -342,6 +348,7 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.menuSubject.setTitle(_translate("MainWindow_bbTriggerBoxx", "Subject", None))
         self.menuActive_Subject.setTitle(_translate("MainWindow_bbTriggerBoxx", "Active Subject", None))
         self.menuHelp.setTitle(_translate("MainWindow_bbTriggerBoxx", "Help", None))
+        self.menuMonitor.setTitle(_translate("MainWindow_bbTriggerBoxx", "Monitor", None))
         self.actionMesh.setText(_translate("MainWindow_bbTriggerBoxx", "Mesh", None))
         self.actionTexture.setText(_translate("MainWindow_bbTriggerBoxx", "Texture", None))
         self.actionConfigure.setText(_translate("MainWindow_bbTriggerBoxx", "Configure", None))
@@ -355,5 +362,6 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.actionNew_Character.setText(_translate("MainWindow_bbTriggerBoxx", "New Character", None))
         self.actionNew_Definition.setText(_translate("MainWindow_bbTriggerBoxx", "New Definition", None))
         self.actionEdit_Prefs.setText(_translate("MainWindow_bbTriggerBoxx", "Edit Prefs", None))
+        self.actionStart_Monitor.setText(_translate("MainWindow_bbTriggerBoxx", "Start Monitor", None))
 
 import bbTriggerBoxx_QRC_rc

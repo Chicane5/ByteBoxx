@@ -4,25 +4,84 @@ Created on 10 Sep 2013
 @author: ByteBoxx
 '''
 #builtins
-import sys, os
+import sys, os, shutil
 import datetime as date
 import serial
 import time
 import pickle
+import Queue
+
 #3rd
 from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import pyqtSlot
+import win32file
+import win32con
 #user
 from ui import bbTriggerBoxx_UI as uifile
 from ui import bbTriggerBoxx_config_UI as configuifile
 from qt import popup
 from smartshooter.session import SetSession, FlexSession
 from app import makepy2exe
+from util import watcher
+from image import bbimage
 
 #globals
 gCONFIG_VAR = 'TRIGGERBOXX_CONFIG'
 gCONFIG_FILE = 'triggerboxx_defaults.txt'
 gSESSION_FILE = 'session.tbs'
 gTAKEDIR_PREFIX = 'tk'
+
+
+        
+class DirectoryPeriodCheck(QtCore.QObject):
+
+    
+    def __init__(self, dir):
+        super(DirectoryPeriodCheck, self).__init__()
+        self.dirToWatch = dir
+        self.names = []
+        self.files = []
+        
+        self.FILE_LIST_DIRECTORY = 0x0001
+
+
+        self.hDir = win32file.CreateFile (
+                                          self.dirToWatch,
+                                          self.FILE_LIST_DIRECTORY,
+                                          win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE | win32con.FILE_SHARE_DELETE,
+                                          None,
+                                          win32con.OPEN_EXISTING,
+                                          win32con.FILE_FLAG_BACKUP_SEMANTICS,
+                                          None
+                                          )
+        
+    @pyqtSlot()
+    def process(self):
+        while 1:
+            results = win32file.ReadDirectoryChangesW (
+                self.hDir,
+                1024,
+                True,
+                win32con.FILE_NOTIFY_CHANGE_FILE_NAME |
+                win32con.FILE_NOTIFY_CHANGE_DIR_NAME |
+                win32con.FILE_NOTIFY_CHANGE_ATTRIBUTES |
+                win32con.FILE_NOTIFY_CHANGE_SIZE |
+                win32con.FILE_NOTIFY_CHANGE_LAST_WRITE |
+                win32con.FILE_NOTIFY_CHANGE_SECURITY,
+                None,
+                None
+              )
+            
+            
+            for r in results:
+                if r[0] == 1:
+                    self.files.append(r[1])
+                    
+            print self.files
+            
+    def addNewTakePath(self, path):
+        print path
+        self.names.append(path)
 
 #===============================================================================
 # 
@@ -77,7 +136,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
     '''
     TriggerBoxx main window class
     '''
-    def __init__(self, parent=None):
+    def __init__(self, watcher, parent=None):
         super(MW_bbTriggerBoxx, self).__init__(parent)
         self.setupUi(self)
         
@@ -99,6 +158,8 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         for x in ['COM1', 'COM3', 'COM4']:
             lAction = self.__dict__['actionOpen_{0}'.format(x)]
             self.connect(lAction, QtCore.SIGNAL("triggered()"), self.openComms)
+            
+        self.connect(self.actionStart_Monitor, QtCore.SIGNAL("triggered()"), self.startMonitor)
         
         #edits/spinners/checks
         self.connect(self.lineEdit_pose, QtCore.SIGNAL("returnPressed()"), self.updatePose)
@@ -114,15 +175,23 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
         #attrs
         #self.sleepDelay = 0 #how long should we wait while the images are copied
-        self.mWatcher = QtCore.QFileSystemWatcher(self)
-        self.connect(self.mWatcher, QtCore.SIGNAL("directoryChanged(QString)"), self.photoBucketChanged)
-        self.mCount = 0
+        #self.thread = QtCore.QThread()
+        #self.pc = DirectoryPeriodCheck()
+        #QtCore.QObject.connect(self.thread, QtCore.SIGNAL("started()"), self.pc.process)
+        #self.pc.moveToThread(self.thread)
+        self.watcher = watcher
+        self.connect(self.watcher, QtCore.SIGNAL("newFile(QString)"), self.newFileProcess)
+        self.connect(self, QtCore.SIGNAL("newPath(QString)"), self.watcher.addNewTakePath)
+
         
     def _main(self):
         self.show()
         
         #load/create a config file
         self.checkConfig()
+        
+    def newFileProcess(self, string):
+        print string
 
     def checkConfig(self):
         if not os.environ.get(gCONFIG_VAR):
@@ -148,7 +217,12 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.mSerial = serial.Serial(str(self.sender().objectName()).lstrip('actionOpen_'), 9600)   # open serial port that Arduino is using
             popup.Popup.info(self, "Successfully opened COM port")
         except:
-            popup.Popup.critical(self, "Fatal! Could not open COM port") 
+            popup.Popup.critical(self, "Fatal! Could not open COM port")
+            
+    def startMonitor(self):
+        #self.mWatcher = watcher.WatchDirectory(os.path.abspath(str(self.lineEdit_photoDownload.text())))
+        self.thread.start()
+        
                
     def populateDefaults(self, pLines):
         for line in pLines:
@@ -230,7 +304,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.radioButton_texture.setEnabled(False)    
         
         self.populateTreeView()
-        self.mWatcher.addPath(QtCore.QString(self.mSession.mRootFolder)) # smartshooter dump folder to watch
         
     def newSubject(self):
         lNewSubjName = popup.Input.getText(self, "Enter new Subject name")
@@ -324,6 +397,8 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             #lCount = self.mSession.moveImages()
             #self.plainTextEdit_logging.appendPlainText('moved {0} images to {1}'.format(lCount, self.mSession.mActiveTakePath))
             
+            self.emit(QtCore.SIGNAL("newPath(QString)") ,QtCore.QString(self.mSession.mActiveTakePath))
+            
             #write out the xml
             if not self.mSession.GenerateXML(str(self.lineEdit_comment.text())):
                 popup.Popup.warning(self, "No JPGs were found - did camera array fire?")
@@ -334,25 +409,22 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 
             self.lineEdit_comment.clear()
             
-    def photoBucketChanged(self, pString):
-        '''
-        this will get called every time the shotbucket is updated
-        '''
-        print pString
-        if self.mCount == 0:
-             
-        self.mCount +=1
+
             
     def closeEvent(self, event):
         #try and pickle the session for later
         with open(os.path.join(self.mSession.mShootFolder, gSESSION_FILE), 'w') as fh:
             pickle.dump(self.mSession, fh)
             
-        print self.mCount
             
 #------------------------------------------------------------------------------ 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
-    win = MW_bbTriggerBoxx()
+    objThread = QtCore.QThread()
+    d = DirectoryPeriodCheck("Z:\\")
+    d.moveToThread(objThread)
+    objThread.started.connect(d.process)
+    objThread.start()
+    win = MW_bbTriggerBoxx(d)
     win._main()
     app.exec_()
