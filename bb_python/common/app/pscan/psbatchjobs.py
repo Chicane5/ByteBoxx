@@ -3,6 +3,8 @@ Created on 11 Mar 2014
 
 @author: ByteBoxx
 '''
+import getpass
+import os
 
 class PSBatchJobs(object):
     '''
@@ -11,6 +13,7 @@ class PSBatchJobs(object):
     '''
     cSINGLE_SPACE = '    '
     cDOUBLE_SPACE = cSINGLE_SPACE+cSINGLE_SPACE
+    cBAT_DIR = 'C:\\Program Files\\ByteBoxx\\RenderBoxx\\bin'
     #standard tasks for processing a photoscan mesh job
     cBATCH_TASKS = ['automask',
                     'align',
@@ -23,7 +26,7 @@ class PSBatchJobs(object):
     
  
     def align(self, label, photodir, accuracy):
-        tempfile = "C:\\Users\\ByteBoxx\\Desktop\\AlignMe.py"
+        tempfile = os.path.abspath(os.path.join(os.path.dirname(photodir), "align.py"))
         with open(tempfile, 'w') as fh:
             fh.write("####AUTO GENERATED PHOTOSCAN SCRIPT...POWERED BY BYTEBOXX LTD###\n\n\n")
             fh.write("import PhotoScan\n")
@@ -44,13 +47,17 @@ class PSBatchJobs(object):
             fh.write(self.cSINGLE_SPACE+"doc.activeChunk.alignPhotos()\n")
             
             
-            fh.write("PhotoScan.app.addMenuItem('ByteBoxx/Align_', main)\n")
+            fh.write("PhotoScan.app.addMenuItem('ByteBoxx/Align_"+tempfile+"', main)\n")
             #fh.write("doc.save('C:\\Users\\ByteBoxx\\Desktop\\align_celery.psz')\n")
             #fh.write("app.quit()")
             
             
             fh.close()
         return tempfile
+    
+    def runInPhotoScan(self, script):
+        return '"' + os.path.join(self.cBAT_DIR, 'copyToPSScripts.bat') +'" ' + script
+        
         
 if __name__ == "__main__":
     psb = PSBatchJobs()

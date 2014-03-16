@@ -13,6 +13,7 @@ from app.pscan import psbatchjobs
 #from app.maya import mybatchjobs
 
 
+
 @app.task
 def align(label, photodir, accuracy):
     psb = psbatchjobs.PSBatchJobs()
@@ -22,7 +23,9 @@ def align(label, photodir, accuracy):
     
 @app.task
 def runInPhotoScan(script):
-    os.system("C:\\Users\\ByteBoxx\\Desktop\\cockit.bat " + script)
+    psb = psbatchjobs.PSBatchJobs()
+    cmd = psb.runInPhotoScan(script)
+    os.system(cmd)
     
 @app.task
 def mayatest():

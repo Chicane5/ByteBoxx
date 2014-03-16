@@ -4,10 +4,11 @@ Created on 26 Oct 2013
 @author: ByteBoxx
 '''
 #builtins
-import sys, os
+import sys, os, time
 import xml.etree.ElementTree as ET
 #3rd
 from PyQt4 import QtCore, QtGui
+
 #user
 from ui import bbRenderBoxx_UI as uifile
 from ui import bbRenderBoxx_queue_UI as queueuifile
@@ -101,7 +102,8 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
         for index,rendertake in enumerate(self.mTakeList):
             
             pyfile = castasks.align.delay(os.path.basename(str(rendertake.mPath)), os.path.join(str(rendertake.mPath), 'jpg'), 'low')
-            castasks.runInPhotoScan(pyfile.get())
+            time.sleep(1.5)
+            castasks.runInPhotoScan.delay(pyfile.get())
 
 #===============================================================================
 # 

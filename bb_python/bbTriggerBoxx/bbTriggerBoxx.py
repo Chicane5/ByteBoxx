@@ -22,24 +22,29 @@ from ui import bbTriggerBoxx_config_UI as configuifile
 from qt import popup
 from smartshooter.session import SetSession, FlexSession
 from util import makepy2exe
-from image import bbimage
 
 #globals
 gCONFIG_VAR = 'TRIGGERBOXX_CONFIG'
 gCONFIG_FILE = 'triggerboxx_defaults.txt'
 gSESSION_FILE = 'session.tbs'
 gTAKEDIR_PREFIX = 'tk'
+gJPGXTNS = ['jpg', 'JPG', 'jpeg', 'JPEG']
+gCR2XTNS = ['cr2', 'CR2']
+gCOMBINED_FILES = ['jpg', 'JPG', 'jpeg', 'JPEG', 'cr2', 'CR2']
 
+gDEBUG = True
 
-        
+#===============================================================================
+# 
+#===============================================================================
 class DirectoryPeriodCheck(QtCore.QObject):
-
-    
+    '''
+    '''
     def __init__(self, dir):
         super(DirectoryPeriodCheck, self).__init__()
         self.dirToWatch = dir
-        self.names = []
-        self.files = []
+        self.filesDictJPG = {} #holds all the new jpg files in dumpster 
+        self.filesDictCR2 = {} #holds all the new cr2 files in dumpster
         
         self.FILE_LIST_DIRECTORY = 0x0001
 
@@ -56,31 +61,44 @@ class DirectoryPeriodCheck(QtCore.QObject):
         
     @pyqtSlot()
     def process(self):
+        thistrigger = None
         while 1:
             results = win32file.ReadDirectoryChangesW (
                 self.hDir,
                 1024,
                 True,
-                win32con.FILE_NOTIFY_CHANGE_FILE_NAME |
-                win32con.FILE_NOTIFY_CHANGE_DIR_NAME |
-                win32con.FILE_NOTIFY_CHANGE_ATTRIBUTES |
-                win32con.FILE_NOTIFY_CHANGE_SIZE |
-                win32con.FILE_NOTIFY_CHANGE_LAST_WRITE |
-                win32con.FILE_NOTIFY_CHANGE_SECURITY,
+                win32con.FILE_NOTIFY_CHANGE_FILE_NAME,
                 None,
                 None
               )
             
             
-            for r in results:
-                if r[0] == 1:
-                    self.files.append(r[1])
-                    
-            print self.files
+            if results:
+                for res in results:
+                    if res[0] == 1:
+                        root, ext = os.path.splitext(res[1])
+                        if any(imagefile in ext for imagefile in gCOMBINED_FILES):
+                            
+                            thistrigger = int(root.split('_')[2])
+
+                                    
+                            #triggers past the first        
+                            if any(jp in ext for jp in gJPGXTNS):
+                                if thistrigger not in self.filesDictJPG.keys():
+                                    self.filesDictJPG[thistrigger] = []
+                                self.filesDictJPG[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
+                            elif any(cr in ext for cr in gCR2XTNS):
+                                if thistrigger not in self.filesDictCR2.keys():
+                                    self.filesDictCR2[thistrigger] = []
+                                self.filesDictCR2[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
+                            
+            #print len(self.filesDictJPG[thistrigger])
+            self.updateDictionaries()
+            time.sleep(0.5)
             
-    def addNewTakePath(self, path):
-        print path
-        self.names.append(path)
+    def updateDictionaries(self):
+        self.emit(QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.filesDictJPG)
+        self.emit(QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.filesDictCR2)
 
 #===============================================================================
 # 
@@ -158,29 +176,25 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             lAction = self.__dict__['actionOpen_{0}'.format(x)]
             self.connect(lAction, QtCore.SIGNAL("triggered()"), self.openComms)
             
-        self.connect(self.actionStart_Monitor, QtCore.SIGNAL("triggered()"), self.startMonitor)
-        
+        self.connect(self.actionCopyNow, QtCore.SIGNAL("triggered()"), self.copyFromDumpster)
+                     
         #edits/spinners/checks
         self.connect(self.lineEdit_pose, QtCore.SIGNAL("returnPressed()"), self.updatePose)
         self.connect(self.lineEdit_bucket, QtCore.SIGNAL("returnPressed()"), self.updateBucket)
         
-        #self.connect(self.spinBox_imgWait, QtCore.SIGNAL("valueChanged(int)"), self.updateInternalSleep) DEPR
-        #self.connect(self.checkBox_jpg, QtCore.SIGNAL("stateChanged(int)"), self.calculateSleepDelay) DEPR
-        #self.connect(self.checkBox_cr2, QtCore.SIGNAL("stateChanged(int)"), self.calculateSleepDelay) DEPR
         
         #main buttons
         self.connect(self.pushButton_fire, QtCore.SIGNAL("clicked()"), self.fireArray)
         self.connect(self.pushButton_prime, QtCore.SIGNAL("clicked()"), self.primeArray)
         
         #attrs
-        #self.sleepDelay = 0 #how long should we wait while the images are copied
-        #self.thread = QtCore.QThread()
-        #self.pc = DirectoryPeriodCheck()
-        #QtCore.QObject.connect(self.thread, QtCore.SIGNAL("started()"), self.pc.process)
-        #self.pc.moveToThread(self.thread)
+        self.filesDictJPG = {}
+        self.filesDictCR2 = {}
+        self.activeTakeNames = []
+
         self.watcher = watcher
-        self.connect(self.watcher, QtCore.SIGNAL("newFile(QString)"), self.newFileProcess)
-        self.connect(self, QtCore.SIGNAL("newPath(QString)"), self.watcher.addNewTakePath)
+        self.connect(watcher, QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.updatefilesDictJPG)
+        self.connect(watcher, QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.updatefilesDictCR2)
 
         
     def _main(self):
@@ -189,8 +203,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         #load/create a config file
         self.checkConfig()
         
-    def newFileProcess(self, string):
-        print string
 
     def checkConfig(self):
         if not os.environ.get(gCONFIG_VAR):
@@ -218,11 +230,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         except:
             popup.Popup.critical(self, "Fatal! Could not open COM port")
             
-    def startMonitor(self):
-        #self.mWatcher = watcher.WatchDirectory(os.path.abspath(str(self.lineEdit_photoDownload.text())))
-        self.thread.start()
-        
-               
+   
     def populateDefaults(self, pLines):
         for line in pLines:
             if line.startswith('photodir'):
@@ -270,7 +278,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             
         #create the shoot folder dir
         lFolderName = str(popup.Input.getText(self, "Enter Root Shoot Folder Name")[0])
-        lShootFolder = os.path.join(self.mSession.mRootFolder, lFolderName + '_' + self.mSession.mType)
+        lShootFolder = os.path.join(os.path.dirname(self.mSession.mRootFolder), lFolderName + '_' + self.mSession.mType)
         
         
         #check for a previous pickled session on disk and try to load
@@ -351,6 +359,12 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.treeView_diskMap.setModel(model)
         self.treeView_diskMap.setRootIndex(root)
         
+    def updatefilesDictJPG(self, adict):
+        self.filesDictJPG = adict
+        
+    def updatefilesDictCR2(self, adict):
+        self.filesDictCR2 = adict
+        
     def CheckSerialComms(self):
         try:
             assert 'mSerial' in self.__dict__
@@ -389,18 +403,14 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             #write to the arduino
             self.mSerial.write('a')
             
-            #sleep to allow images to drop in?
-            #time.sleep(self.sleepDelay)
-
-            #cleanup the images to the active take directory
-            #lCount = self.mSession.moveImages()
+          
             #self.plainTextEdit_logging.appendPlainText('moved {0} images to {1}'.format(lCount, self.mSession.mActiveTakePath))
             
-            self.emit(QtCore.SIGNAL("newPath(QString)") ,QtCore.QString(self.mSession.mActiveTakePath))
+            self.activeTakeNames.append(self.mSession.mActiveTakePath)
             
             #write out the xml
-            if not self.mSession.GenerateXML(str(self.lineEdit_comment.text())):
-                popup.Popup.warning(self, "No JPGs were found - did camera array fire?")
+            #if not self.mSession.GenerateXML(str(self.lineEdit_comment.text())):
+                #popup.Popup.warning(self, "No JPGs were found - did camera array fire?")
             
             #increment take?
             if self.checkBox_inc.isChecked():
@@ -408,8 +418,24 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 
             self.lineEdit_comment.clear()
             
+    def copyFromDumpster(self):
+        for i, v in enumerate(self.activeTakeNames):
+
+            if self.filesDictJPG != {}:
+                for jfile in self.filesDictJPG[i+1]:
+                    lsplit = os.path.basename(jfile).split('_')
+                    shutil.move(jfile, os.path.join(v, 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
+            if self.filesDictCR2 != {}:
+                for cfile in self.filesDictCR2[i+1]:
+                    lsplit = os.path.basename(cfile).split('_')
+                    shutil.move(cfile, os.path.join(v, 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
+                        
 
             
+        self.activeTakeName = []
+        self.filesDictJPG = {}
+        self.filesDictCR2 = {}
+        
     def closeEvent(self, event):
         #try and pickle the session for later
         with open(os.path.join(self.mSession.mShootFolder, gSESSION_FILE), 'w') as fh:
@@ -420,7 +446,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
     objThread = QtCore.QThread()
-    d = DirectoryPeriodCheck("Z:\\")
+    if gDEBUG:
+        d = DirectoryPeriodCheck("Z:\\dumpster\\SS")
+    else:
+        d = DirectoryPeriodCheck(sys.argv[1])
     d.moveToThread(objThread)
     objThread.started.connect(d.process)
     objThread.start()
