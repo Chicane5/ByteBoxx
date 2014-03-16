@@ -10,37 +10,48 @@ class PSBatchJobs(object):
     generate them dynamically at runtime you Russian bastards
     '''
     cSINGLE_SPACE = '    '
-    cDOUBLE_SPACE = cSINGLE_SPACE+cSINGLE_SPACE 
+    cDOUBLE_SPACE = cSINGLE_SPACE+cSINGLE_SPACE
+    #standard tasks for processing a photoscan mesh job
+    cBATCH_TASKS = ['automask',
+                    'align',
+                    'builddensecloud',
+                    'geotexbuild',
+                    'modelexport']
     
     def __init__(self):
         pass
     
  
     def align(self, label, photodir, accuracy):
-        with open("C:\\Users\\ByteBoxx\\Desktop\\AlignMe.py", 'w') as fh:
+        tempfile = "C:\\Users\\ByteBoxx\\Desktop\\AlignMe.py"
+        with open(tempfile, 'w') as fh:
             fh.write("####AUTO GENERATED PHOTOSCAN SCRIPT...POWERED BY BYTEBOXX LTD###\n\n\n")
             fh.write("import PhotoScan\n")
             fh.write("import os\n\n")
-            fh.write("app = PhotoScan.Application()\n")
-            fh.write("doc = PhotoScan.Document()\n")
+            fh.write("def main():\n")
+            fh.write(self.cSINGLE_SPACE+"app = PhotoScan.Application()\n")
+            fh.write(self.cSINGLE_SPACE+"doc = app.document\n")
             
-            fh.write("chunk = PhotoScan.Chunk()\n")
-            fh.write("chunk.label = '"+label+"'\n")
-            fh.write("doc.chunks.add(chunk)\n")
-            fh.write("photos_list = os.listdir('"+photodir+"')\n")
+            fh.write(self.cSINGLE_SPACE+"chunk = PhotoScan.Chunk()\n")
+            fh.write(self.cSINGLE_SPACE+"chunk.label = '"+label+"'\n")
+            fh.write(self.cSINGLE_SPACE+"doc.chunks.add(chunk)\n")
+            fh.write(self.cSINGLE_SPACE+"photos_list = os.listdir('"+photodir+"')\n")
             
-            fh.write("for photo_name in photos_list:\n")
-            fh.write(self.cSINGLE_SPACE+"chunk.photos.add(os.path.join('"+photodir+"', photo_name))\n")
+            fh.write(self.cSINGLE_SPACE+"for photo_name in photos_list:\n")
+            fh.write(self.cDOUBLE_SPACE+"chunk.photos.add(os.path.join('"+photodir+"', photo_name))\n")
             
-            fh.write("chunk.matchPhotos(accuracy='"+accuracy+"', preselection='disabled', filter_mask=False)\n")
-            fh.write("chunk.alignPhotos()\n")
+            fh.write(self.cSINGLE_SPACE+"doc.activeChunk.matchPhotos(accuracy='"+accuracy+"', preselection='disabled', filter_mask=False)\n")
+            fh.write(self.cSINGLE_SPACE+"doc.activeChunk.alignPhotos()\n")
             
+            
+            fh.write("PhotoScan.app.addMenuItem('ByteBoxx/Align_', main)\n")
             #fh.write("doc.save('C:\\Users\\ByteBoxx\\Desktop\\align_celery.psz')\n")
             #fh.write("app.quit()")
             
             
             fh.close()
-            
+        return tempfile
+        
 if __name__ == "__main__":
     psb = PSBatchJobs()
     psb.align('twat', "C:\\sometwatdir\\init", "low")

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>637</width>
-    <height>548</height>
+    <width>808</width>
+    <height>450</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -163,21 +163,15 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>637</width>
+     <width>808</width>
      <height>21</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuResource">
-    <property name="title">
-     <string>Resource</string>
-    </property>
-    <addaction name="actionNew_Resource_File"/>
-    <addaction name="actionLoad_Resource_File"/>
-   </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
      <string>Help</string>
     </property>
+    <addaction name="actionHelp_on_RenderBoxx"/>
    </widget>
    <widget class="QMenu" name="menuAbout">
     <property name="title">
@@ -185,7 +179,6 @@
     </property>
     <addaction name="actionRenderBoxx"/>
    </widget>
-   <addaction name="menuResource"/>
    <addaction name="menuHelp"/>
    <addaction name="menuAbout"/>
   </widget>
@@ -203,6 +196,11 @@
   <action name="actionRenderBoxx">
    <property name="text">
     <string>RenderBoxx</string>
+   </property>
+  </action>
+  <action name="actionHelp_on_RenderBoxx">
+   <property name="text">
+    <string>Help on RenderBoxx</string>
    </property>
   </action>
  </widget>

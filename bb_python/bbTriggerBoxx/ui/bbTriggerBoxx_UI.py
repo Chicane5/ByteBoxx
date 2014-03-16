@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bbTriggerBoxx_UI.ui'
 #
-# Created: Thu Mar 06 21:48:41 2014
+# Created: Sun Mar 16 09:51:22 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -249,8 +249,8 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.menuActive_Subject.setObjectName(_fromUtf8("menuActive_Subject"))
         self.menuHelp = QtGui.QMenu(self.menubar)
         self.menuHelp.setObjectName(_fromUtf8("menuHelp"))
-        self.menuMonitor = QtGui.QMenu(self.menubar)
-        self.menuMonitor.setObjectName(_fromUtf8("menuMonitor"))
+        self.menuCopy = QtGui.QMenu(self.menubar)
+        self.menuCopy.setObjectName(_fromUtf8("menuCopy"))
         MainWindow_bbTriggerBoxx.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow_bbTriggerBoxx)
         self.statusbar.setObjectName(_fromUtf8("statusbar"))
@@ -283,9 +283,16 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.actionEdit_Prefs.setObjectName(_fromUtf8("actionEdit_Prefs"))
         self.actionStart_Monitor = QtGui.QAction(MainWindow_bbTriggerBoxx)
         self.actionStart_Monitor.setObjectName(_fromUtf8("actionStart_Monitor"))
+        self.actionCopyNow = QtGui.QAction(MainWindow_bbTriggerBoxx)
+        self.actionCopyNow.setObjectName(_fromUtf8("actionCopyNow"))
+        self.actionLoad_Session = QtGui.QAction(MainWindow_bbTriggerBoxx)
+        self.actionLoad_Session.setObjectName(_fromUtf8("actionLoad_Session"))
+        self.actionHelp_on_TriggerBoxx = QtGui.QAction(MainWindow_bbTriggerBoxx)
+        self.actionHelp_on_TriggerBoxx.setObjectName(_fromUtf8("actionHelp_on_TriggerBoxx"))
         self.menuNew_Session.addAction(self.actionMesh)
         self.menuNew_Session.addAction(self.actionTexture)
         self.menuFile.addAction(self.menuNew_Session.menuAction())
+        self.menuFile.addAction(self.actionLoad_Session)
         self.menuFile.addAction(self.actionEdit_Prefs)
         self.menuAbout.addAction(self.actionTriggerBoxx)
         self.menuComms.addAction(self.actionOpen_COM1)
@@ -295,11 +302,12 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.menuActive_Subject.addAction(self.actionNew_Definition)
         self.menuSubject.addAction(self.actionNew_Subject)
         self.menuSubject.addAction(self.menuActive_Subject.menuAction())
-        self.menuMonitor.addAction(self.actionStart_Monitor)
+        self.menuHelp.addAction(self.actionHelp_on_TriggerBoxx)
+        self.menuCopy.addAction(self.actionCopyNow)
         self.menubar.addAction(self.menuFile.menuAction())
+        self.menubar.addAction(self.menuCopy.menuAction())
         self.menubar.addAction(self.menuComms.menuAction())
         self.menubar.addAction(self.menuSubject.menuAction())
-        self.menubar.addAction(self.menuMonitor.menuAction())
         self.menubar.addAction(self.menuHelp.menuAction())
         self.menubar.addAction(self.menuAbout.menuAction())
         self.label.setBuddy(self.lineEdit_subject)
@@ -348,7 +356,7 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.menuSubject.setTitle(_translate("MainWindow_bbTriggerBoxx", "Subject", None))
         self.menuActive_Subject.setTitle(_translate("MainWindow_bbTriggerBoxx", "Active Subject", None))
         self.menuHelp.setTitle(_translate("MainWindow_bbTriggerBoxx", "Help", None))
-        self.menuMonitor.setTitle(_translate("MainWindow_bbTriggerBoxx", "Monitor", None))
+        self.menuCopy.setTitle(_translate("MainWindow_bbTriggerBoxx", "Copy", None))
         self.actionMesh.setText(_translate("MainWindow_bbTriggerBoxx", "Mesh", None))
         self.actionTexture.setText(_translate("MainWindow_bbTriggerBoxx", "Texture", None))
         self.actionConfigure.setText(_translate("MainWindow_bbTriggerBoxx", "Configure", None))
@@ -363,5 +371,8 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         self.actionNew_Definition.setText(_translate("MainWindow_bbTriggerBoxx", "New Definition", None))
         self.actionEdit_Prefs.setText(_translate("MainWindow_bbTriggerBoxx", "Edit Prefs", None))
         self.actionStart_Monitor.setText(_translate("MainWindow_bbTriggerBoxx", "Start Monitor", None))
+        self.actionCopyNow.setText(_translate("MainWindow_bbTriggerBoxx", "CopyNow", None))
+        self.actionLoad_Session.setText(_translate("MainWindow_bbTriggerBoxx", "Load Session", None))
+        self.actionHelp_on_TriggerBoxx.setText(_translate("MainWindow_bbTriggerBoxx", "Help on TriggerBoxx", None))
 
 import bbTriggerBoxx_QRC_rc

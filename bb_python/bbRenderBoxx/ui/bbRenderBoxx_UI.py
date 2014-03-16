@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bbRenderBoxx_UI.ui'
 #
-# Created: Sun Nov 03 18:17:32 2013
+# Created: Sun Mar 16 09:54:48 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,7 +26,7 @@ except AttributeError:
 class Ui_MainWindow_bbRenderBoxx(object):
     def setupUi(self, MainWindow_bbRenderBoxx):
         MainWindow_bbRenderBoxx.setObjectName(_fromUtf8("MainWindow_bbRenderBoxx"))
-        MainWindow_bbRenderBoxx.resize(637, 548)
+        MainWindow_bbRenderBoxx.resize(808, 450)
         self.centralwidget = QtGui.QWidget(MainWindow_bbRenderBoxx)
         self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
         self.verticalLayout_3 = QtGui.QVBoxLayout(self.centralwidget)
@@ -104,10 +104,8 @@ class Ui_MainWindow_bbRenderBoxx(object):
         self.verticalLayout_3.addLayout(self.horizontalLayout)
         MainWindow_bbRenderBoxx.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow_bbRenderBoxx)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 637, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 808, 21))
         self.menubar.setObjectName(_fromUtf8("menubar"))
-        self.menuResource = QtGui.QMenu(self.menubar)
-        self.menuResource.setObjectName(_fromUtf8("menuResource"))
         self.menuHelp = QtGui.QMenu(self.menubar)
         self.menuHelp.setObjectName(_fromUtf8("menuHelp"))
         self.menuAbout = QtGui.QMenu(self.menubar)
@@ -122,10 +120,10 @@ class Ui_MainWindow_bbRenderBoxx(object):
         self.actionLoad_Resource_File.setObjectName(_fromUtf8("actionLoad_Resource_File"))
         self.actionRenderBoxx = QtGui.QAction(MainWindow_bbRenderBoxx)
         self.actionRenderBoxx.setObjectName(_fromUtf8("actionRenderBoxx"))
-        self.menuResource.addAction(self.actionNew_Resource_File)
-        self.menuResource.addAction(self.actionLoad_Resource_File)
+        self.actionHelp_on_RenderBoxx = QtGui.QAction(MainWindow_bbRenderBoxx)
+        self.actionHelp_on_RenderBoxx.setObjectName(_fromUtf8("actionHelp_on_RenderBoxx"))
+        self.menuHelp.addAction(self.actionHelp_on_RenderBoxx)
         self.menuAbout.addAction(self.actionRenderBoxx)
-        self.menubar.addAction(self.menuResource.menuAction())
         self.menubar.addAction(self.menuHelp.menuAction())
         self.menubar.addAction(self.menuAbout.menuAction())
         self.label.setBuddy(self.lineEdit_session)
@@ -143,11 +141,11 @@ class Ui_MainWindow_bbRenderBoxx(object):
         self.pushButton_remQueue.setText(_translate("MainWindow_bbRenderBoxx", "<- Queue", None))
         self.pushButton_info.setText(_translate("MainWindow_bbRenderBoxx", "More Info", None))
         self.pushButton_genBatch.setText(_translate("MainWindow_bbRenderBoxx", "Generate Batch...", None))
-        self.menuResource.setTitle(_translate("MainWindow_bbRenderBoxx", "Resource", None))
         self.menuHelp.setTitle(_translate("MainWindow_bbRenderBoxx", "Help", None))
         self.menuAbout.setTitle(_translate("MainWindow_bbRenderBoxx", "About", None))
         self.actionNew_Resource_File.setText(_translate("MainWindow_bbRenderBoxx", "New Resource File", None))
         self.actionLoad_Resource_File.setText(_translate("MainWindow_bbRenderBoxx", "Load Resource File", None))
         self.actionRenderBoxx.setText(_translate("MainWindow_bbRenderBoxx", "RenderBoxx", None))
+        self.actionHelp_on_RenderBoxx.setText(_translate("MainWindow_bbRenderBoxx", "Help on RenderBoxx", None))
 
 import bbRenderBoxx_QRC_rc

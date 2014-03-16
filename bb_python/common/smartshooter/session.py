@@ -10,8 +10,9 @@ import xml.etree.cElementTree as ET
 #3rd
 #user
 from image.meta import Meta
-from qt.popup import Popup
-from batch import batchtypes
+from app.maya import mybatchjobs
+from app.pscan import psbatchjobs
+from util import utilbatchjobs
 #globals
 
 
@@ -40,23 +41,24 @@ class DataTake(object):
             if ext == '.xml':
                 self.mXML = os.path.join(str(self.mPath), lContent)
                 break
-        if not self.mXML:
-            twat = Popup.question(None, "create XML?")
-            print twat
             
+        if not self.mXML:
+            return False
+            
+        return True
+    
     def popBatchJobs(self):
         '''
         populate default batch job to appear in queue window
         '''
-        self.mBatchJobs.append('tk')
+        #self.mBatchJobs.append('tk')
         
     def updateBatchVersions(self):
         '''
         update dict to dynamically keep latest batch versions and their file path up to date
         '''
         if not self.mXML:
-            Popup.warning(self, "No bound XML! Cannot update batch versions for this take")
-            return
+            return False
         
         lTree = ET.parse(self.mXML)
         root = lTree.getroot()
@@ -77,7 +79,7 @@ class DataTake(object):
 #=======================================================================
 class MeshTake(DataTake):
     '''
-    mesh take object, specific to data being passed into photoscan
+    mesh take object, specific to data being passed into photoscan post pipe
     '''
     def __init__(self, pPath):
         super(MeshTake, self).__init__(pPath)
@@ -87,9 +89,9 @@ class MeshTake(DataTake):
         '''
         populate batch jobs specific to mesh processing
         '''
-        super(MeshTake, self).popBatchJobs()
-        self.mBatchJobs.extend(batchtypes.gMESH_TASKS)
-             
+        #super(MeshTake, self).popBatchJobs()
+        self.mBatchJobs.extend(psbatchjobs.PSBatchJobs.cBATCH_TASKS) 
+        self.mBatchJobs.extend(mybatchjobs.MYBatchJobs.cBATCH_TASKS)
         
 #=======================================================================
 # 
@@ -106,8 +108,8 @@ class TextureTake(DataTake):
         '''
         populate batch jobs specific to texture processing
         '''
-        super(TextureTake, self).popBatchJobs()
-        self.mBatchJobs.extend(batchtypes.gTEX_TASKS)
+        #super(TextureTake, self).popBatchJobs()
+        #self.mBatchJobs.extend(batchtypes.gTEX_TASKS)
         
         
 #===============================================================================
@@ -139,11 +141,12 @@ class Session(object):
     def setActiveTakePath(self, pPath):
         self.mActiveTakePath = pPath
         
+    '''
     def moveImages(self):
-        '''
+        
         after images land in the global shot directory bucket
         we move them into the active take path. Sanity checks how many images we expect to copy
-        '''
+        
         lFinished = 0
         count = 0
         while not lFinished:
@@ -157,7 +160,8 @@ class Session(object):
                     count = count + 1
             lFinished = 1
         return count
-    
+    '''
+        
     def GenerateXML(self, pCommentStr):
         '''
         once we have copied all the images over to the proper take directory, we need to generate some
@@ -214,16 +218,22 @@ class Session(object):
         #batch stuff - will differ for session types
         lBatchEl = ET.SubElement(lTakeRootEl, "batch")
         
+        lTasks = []
         if self.mType == 'Mesh':
-            for task in batchtypes.gMESH_TASKS:
+            lTasks.extend(psbatchjobs.PSBatchJobs.cBATCH_TASKS)
+            lTasks.extend(mybatchjobs.MYBatchJobs.cBATCH_TASKS)
+            lTasks.extend(utilbatchjobs.UTILBatchJobs.cBATCH_TASKS)
+            for task in lTasks:
                 lTaskEl = ET.SubElement(lBatchEl, task)
                 lTaskEl.text = "v0"
           
+        '''
         elif self.mType == 'Texture':
             for task in batchtypes.gTEX_TASKS:
                 lTaskEl = ET.SubElement(lBatchEl, task)
                 lTaskEl.text = "v0"
-        
+        '''
+                
         tree = ET.ElementTree(lTakeRootEl)
         tree.write(os.path.join(self.mActiveTakePath, 'bb_takeInfo.xml'))
         

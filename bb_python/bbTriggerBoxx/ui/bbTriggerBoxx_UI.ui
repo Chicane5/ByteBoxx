@@ -487,6 +487,7 @@
      <addaction name="actionTexture"/>
     </widget>
     <addaction name="menuNew_Session"/>
+    <addaction name="actionLoad_Session"/>
     <addaction name="actionEdit_Prefs"/>
    </widget>
    <widget class="QMenu" name="menuAbout">
@@ -521,17 +522,18 @@
     <property name="title">
      <string>Help</string>
     </property>
+    <addaction name="actionHelp_on_TriggerBoxx"/>
    </widget>
-   <widget class="QMenu" name="menuMonitor">
+   <widget class="QMenu" name="menuCopy">
     <property name="title">
-     <string>Monitor</string>
+     <string>Copy</string>
     </property>
-    <addaction name="actionStart_Monitor"/>
+    <addaction name="actionCopyNow"/>
    </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuCopy"/>
    <addaction name="menuComms"/>
    <addaction name="menuSubject"/>
-   <addaction name="menuMonitor"/>
    <addaction name="menuHelp"/>
    <addaction name="menuAbout"/>
   </widget>
@@ -604,6 +606,21 @@
   <action name="actionStart_Monitor">
    <property name="text">
     <string>Start Monitor</string>
+   </property>
+  </action>
+  <action name="actionCopyNow">
+   <property name="text">
+    <string>CopyNow</string>
+   </property>
+  </action>
+  <action name="actionLoad_Session">
+   <property name="text">
+    <string>Load Session</string>
+   </property>
+  </action>
+  <action name="actionHelp_on_TriggerBoxx">
+   <property name="text">
+    <string>Help on TriggerBoxx</string>
    </property>
   </action>
  </widget>

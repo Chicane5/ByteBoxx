@@ -14,6 +14,8 @@ from ui import bbRenderBoxx_queue_UI as queueuifile
 from ui import bbRenderBoxx_info_UI as infouifile
 from qt import popup
 from smartshooter.session import MeshTake, TextureTake
+import cascelery.tasks as castasks
+
 
 
 #===============================================================================
@@ -29,12 +31,10 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
     def __init__(self,parent=None):
         super(DL_bbRenderBoxxQueue, self).__init__(parent)
         self.setupUi(self)
-        self.mTakeList = []
-        #self.mBtnList = []
+        self.mTakeList = [] #contains take objects to process
         
         #connections
-        self.connect(self.pushButton_moveUp, QtCore.SIGNAL("clicked()"), self._getFile)
-        self.connect(self.tableWidget_queue, QtCore.SIGNAL("cellActivated(int,int"), self._expand)
+        self.connect(self.pushButton_render, QtCore.SIGNAL("clicked()"), self._render)
         
         
     def _main(self, pTakeList):
@@ -43,24 +43,12 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
         self._populate()
         
     def _populate(self):
-        #what kind of data are we dealing with?
-        '''
-        if self.mTakeList[0].mType == self.mTakeList[0].cMESH_DATA:
-            print 'mesh'
-        elif self.mTakeList[0].mType == self.mTakeList[0].cTEX_DATA:
-            print 'tex'
-        '''
 
-        i = len(self.mTakeList[0].mBatchJobs)
-        lPlusBatchTk = self.mTakeList[0]
-        for job in self.mTakeList[1:]:
-            if len(job.mBatchJobs) > i:
-                i = len(job.mBatchJobs)
-                lPlusBatchTk = job
-                
+        
+             
         self.tableWidget_queue.setRowCount(len(self.mTakeList))
-        self.tableWidget_queue.setColumnCount(i)
-        self.tableWidget_queue.setHorizontalHeaderLabels(lPlusBatchTk.mBatchJobs)
+        self.tableWidget_queue.setColumnCount(len(self.mTakeList[0].mBatchJobs)+1)
+        self.tableWidget_queue.setHorizontalHeaderLabels(['path']+self.mTakeList[0].mBatchJobs+['priority'])
         
         for lTkRow in range(len(self.mTakeList)):
             #set the default 'tk' column
@@ -69,8 +57,6 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
             self.tableWidget_queue.setItem(lTkRow,0, item)
             #set the batch widgets - get the current batch versions from the XML
             for index,value in enumerate(self.mTakeList[lTkRow].mBatchJobs):
-                if value == 'tk': #default, ignore
-                    continue
                 
                 #do all the widget stuff :/
                 lWidgetNew = QtGui.QWidget()
@@ -95,16 +81,14 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
                 lHLayout.addWidget(lFieldNew)
                 lHLayout.addWidget(lButBseNew)
                 lHLayout.addWidget(lButNew)
+                lHLayout.layout()
                 lWidgetNew.setLayout(lHLayout)
                 
-                self.tableWidget_queue.setCellWidget(lTkRow,index,lWidgetNew)
+                self.tableWidget_queue.setCellWidget(lTkRow,index+1,lWidgetNew)
                 self.tableWidget_queue.setRowHeight(lTkRow, DL_bbRenderBoxxQueue.cROW_HEIGHT)
                 
         
         
-        
-    def _addCmd(self, pCmdStr):
-        pass
     
     def _getFile(self):
         #print self.sender()
@@ -112,9 +96,12 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
         if lDir:
             self.sender().parentWidget().layout().itemAt(1).widget().setText(lDir) #edit field
         
-    def _expand(self, pRow, pColumn):
-        print "wanker"
     
+    def _render(self):
+        for index,rendertake in enumerate(self.mTakeList):
+            
+            pyfile = castasks.align.delay(os.path.basename(str(rendertake.mPath)), os.path.join(str(rendertake.mPath), 'jpg'), 'low')
+            castasks.runInPhotoScan(pyfile.get())
 
 #===============================================================================
 # 
@@ -209,20 +196,31 @@ class MW_bbRenderBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbRenderBoxx):
         
     def AddQueue(self):
         if self.CheckForModel():
+            lNeedXML = False
             #get the path from the tree view and ensure they are only trying to add take objects
             lPath = self.ResolveTreeIndex()
             if not os.path.basename(str(lPath)).startswith('tk'):
                 #popup.Popup.warning(self, "Only take objects can be added to the process queue!")
                 ltest = popup.Popup.question(self, "this directory doesn't appear to be a standard take dir.\nAdd this directory anyway?")
-                print ltest
-                return
+                if ltest == 1:
+                    return
+                elif ltest == 0:
+                    lNeedXML = True
                 
             #what take type are we dealing with
             if self.mRootPath.endswith('_Mesh'):
                 lProcTake = MeshTake(lPath)
             elif self.mRootPath.endswith('_Texture'):
                 lProcTake = TextureTake(lPath)
-            lProcTake.BindXML() #check for XML and bind it
+            if lNeedXML:
+                #create it
+                pass
+                
+            lsuccess = lProcTake.BindXML() #check for XML and bind it
+            if not lsuccess:
+                popup.Popup.critical(self, "No XML for this data set - can't continue with processing!")
+                return
+            
             lProcTake.updateBatchVersions()
             #save the take in the dict, reference it by path name
             if not lPath in self.mProcessQueue.keys():

@@ -21,8 +21,7 @@ from ui import bbTriggerBoxx_UI as uifile
 from ui import bbTriggerBoxx_config_UI as configuifile
 from qt import popup
 from smartshooter.session import SetSession, FlexSession
-from app import makepy2exe
-from util import watcher
+from util import makepy2exe
 from image import bbimage
 
 #globals

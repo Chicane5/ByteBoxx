@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>652</width>
-    <height>549</height>
+    <height>343</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -38,9 +38,9 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="tab_res">
+     <widget class="QWidget" name="tab_mon">
       <attribute name="title">
-       <string>Resources</string>
+       <string>Monitor</string>
       </attribute>
       <layout class="QVBoxLayout" name="verticalLayout_5">
        <item>
@@ -50,7 +50,13 @@
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_4">
           <item>
-           <widget class="QTableWidget" name="tableWidget_res"/>
+           <widget class="QWebView" name="webView_monitor">
+            <property name="url">
+             <url>
+              <string>http://localhost:5555/</string>
+             </url>
+            </property>
+           </widget>
           </item>
          </layout>
         </widget>
@@ -69,28 +75,7 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
-       <widget class="QPushButton" name="pushButton_moveUp">
-        <property name="text">
-         <string>Move Up</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton_moveDown">
-        <property name="text">
-         <string>Move Down</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton_addCmd">
-        <property name="text">
-         <string>Add Cmd Task</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="pushButton">
+       <widget class="QPushButton" name="pushButton_render">
         <property name="font">
          <font>
           <pointsize>10</pointsize>
@@ -102,89 +87,40 @@
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="checkBox_notifyTask">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="font">
-         <font>
-          <italic>false</italic>
-          <strikeout>false</strikeout>
-          <kerning>true</kerning>
-         </font>
-        </property>
+       <widget class="QCheckBox" name="checkBox_mail">
         <property name="text">
-         <string>Notify on Task</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QCheckBox" name="checkBox_notifyJob">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="text">
-         <string>Notify on Job</string>
+         <string>Mail on Task Completion</string>
         </property>
         <property name="checked">
          <bool>true</bool>
         </property>
-        <property name="tristate">
-         <bool>false</bool>
-        </property>
        </widget>
       </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="groupBox_logging">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="minimumSize">
-      <size>
-       <width>0</width>
-       <height>136</height>
-      </size>
-     </property>
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>136</height>
-      </size>
-     </property>
-     <property name="title">
-      <string>Logging</string>
-     </property>
-     <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
-       <widget class="QTextEdit" name="textEdit_logging">
-        <property name="maximumSize">
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
          <size>
-          <width>16777215</width>
-          <height>16777215</height>
+          <width>373</width>
+          <height>20</height>
          </size>
         </property>
-        <property name="readOnly">
-         <bool>true</bool>
-        </property>
-       </widget>
+       </spacer>
       </item>
      </layout>
     </widget>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QWebView</class>
+   <extends>QWidget</extends>
+   <header>QtWebKit/QWebView</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
