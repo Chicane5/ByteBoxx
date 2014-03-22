@@ -16,6 +16,10 @@ class MYBatchJobs(object):
                     'batchrender',
                     'webglexport']
     
+    cBATCH_PARAMS = {'scanassembly':[],
+                    'batchrender':[],
+                    'webglexport':[]}
+    
     def __init__(self):
         pass
     

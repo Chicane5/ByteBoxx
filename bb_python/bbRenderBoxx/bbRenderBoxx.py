@@ -18,7 +18,6 @@ from smartshooter.session import MeshTake, TextureTake
 import cascelery.tasks as castasks
 
 
-
 #===============================================================================
 # 
 #===============================================================================
@@ -45,25 +44,30 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
         
     def _populate(self):
 
-        
-             
-        self.tableWidget_queue.setRowCount(len(self.mTakeList))
+        self.tableWidget_queue.setRowCount(len(self.mTakeList)) #the amount of takes we have in the queue
         self.tableWidget_queue.setColumnCount(len(self.mTakeList[0].mBatchJobs)+1)
         self.tableWidget_queue.setHorizontalHeaderLabels(['path']+self.mTakeList[0].mBatchJobs+['priority'])
         
         for lTkRow in range(len(self.mTakeList)):
-            #set the default 'tk' column
+            #set the path
             item = QtGui.QTableWidgetItem()
             item.setText(self.mTakeList[lTkRow].mPath)
             self.tableWidget_queue.setItem(lTkRow,0, item)
+            
             #set the batch widgets - get the current batch versions from the XML
             for index,value in enumerate(self.mTakeList[lTkRow].mBatchJobs):
                 
+                
+                #create the object
+                #lobj = castasks
+                #self.mTakeList[lTkRow].
                 #do all the widget stuff :/
                 lWidgetNew = QtGui.QWidget()
                 lHLayout = QtGui.QHBoxLayout()
                 #-
                 lCheckNew = QtGui.QCheckBox()
+                self.connect(lCheckNew, QtCore.SIGNAL("stateChanged (int)"), self._checkUpdated)
+                
                 lCheckNew.setText(self.mTakeList[lTkRow].mBatchVersions[value][0]) #pull the current version from the take's dictionary
                 lFieldNew = QtGui.QLineEdit()
                 try:
@@ -71,39 +75,56 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
                 except IndexError:
                     lFieldNew.setText("no file")
                 lFieldNew.setMinimumWidth(DL_bbRenderBoxxQueue.cLINE_EDIT_MIN_WIDTH)
-                lButBseNew = QtGui.QPushButton()
-                lButBseNew.setText("look")
-                self.connect(lButBseNew, QtCore.SIGNAL("clicked()"), self._getFile)
-                #self.mBtnList.append(lButBseNew)
-                lButNew = QtGui.QPushButton()
-                lButNew.setText("params")
                 #-
+                lButBseNew = QtGui.QPushButton() #do we want to look up to an older batch version
+                lButBseNew.setText("prev version")
+                self.connect(lButBseNew, QtCore.SIGNAL("clicked()"), self._getFile)
+                
+                #dump in the layout
                 lHLayout.addWidget(lCheckNew)
                 lHLayout.addWidget(lFieldNew)
                 lHLayout.addWidget(lButBseNew)
-                lHLayout.addWidget(lButNew)
+                
+                paramlabel, paramdial = None, None
+                for param_and_default in self.mTakeList[lTkRow].mBatchJobsParams[value]:
+                    paramlabel = QtGui.QLabel(param_and_default[0])
+                    if isinstance(param_and_default[1], str):
+                        paramdial = QtGui.QLineEdit()
+                        paramdial.setText(param_and_default[1])
+                    elif isinstance(param_and_default[1], int): 
+                        paramdial = QtGui.QSpinBox()
+                        paramdial.setValue(param_and_default[1])
+                        
+                    paramdial.setParent(paramlabel)
+                    lHLayout.addWidget(paramlabel)
+                    lHLayout.addWidget(paramdial)
+                
                 lHLayout.layout()
                 lWidgetNew.setLayout(lHLayout)
                 
                 self.tableWidget_queue.setCellWidget(lTkRow,index+1,lWidgetNew)
                 self.tableWidget_queue.setRowHeight(lTkRow, DL_bbRenderBoxxQueue.cROW_HEIGHT)
-                
         
+            #priority
+            
         
-    
     def _getFile(self):
         #print self.sender()
         lDir = popup.FileDialog.getDirectory(self, "pick a version directory")
         if lDir:
             self.sender().parentWidget().layout().itemAt(1).widget().setText(lDir) #edit field
-        
     
+    def _checkUpdated(self, pState):
+        print self.tableWidget_queue.currentColumn()
+        print pState
+        
     def _render(self):
         for index,rendertake in enumerate(self.mTakeList):
             
-            pyfile = castasks.align.delay(os.path.basename(str(rendertake.mPath)), os.path.join(str(rendertake.mPath), 'jpg'), 'low')
-            time.sleep(1.5)
-            castasks.runInPhotoScan.delay(pyfile.get())
+            pass
+            #pyfile = castasks.align.delay(os.path.basename(str(rendertake.mPath)), os.path.join(str(rendertake.mPath), 'jpg'), 'low')
+            #time.sleep(1.5)
+            #castasks.runInPhotoScan.delay(pyfile.get())
 
 #===============================================================================
 # 

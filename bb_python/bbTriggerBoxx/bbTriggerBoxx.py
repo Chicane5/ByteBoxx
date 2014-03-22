@@ -403,15 +403,8 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             #write to the arduino
             self.mSerial.write('a')
             
-          
-            #self.plainTextEdit_logging.appendPlainText('moved {0} images to {1}'.format(lCount, self.mSession.mActiveTakePath))
-            
-            self.activeTakeNames.append(self.mSession.mActiveTakePath)
-            
-            #write out the xml
-            #if not self.mSession.GenerateXML(str(self.lineEdit_comment.text())):
-                #popup.Popup.warning(self, "No JPGs were found - did camera array fire?")
-            
+            #update our active take names
+            self.activeTakeNames.append((self.mSession.mActiveTakePath, self.lineEdit_comment.text()))          
             #increment take?
             if self.checkBox_inc.isChecked():
                 self.spinBox_take.setValue(self.spinBox_take.value() + 1)
@@ -419,20 +412,23 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.lineEdit_comment.clear()
             
     def copyFromDumpster(self):
+        '''
+        we need to flush everything from Dumpster and create XML info for each take
+        '''
         for i, v in enumerate(self.activeTakeNames):
 
             if self.filesDictJPG != {}:
-                for jfile in self.filesDictJPG[i+1]:
+                for jfile in self.filesDictJPG[i+1]: #we have to assume SmartShooter batch started at 0001
                     lsplit = os.path.basename(jfile).split('_')
-                    shutil.move(jfile, os.path.join(v, 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
+                    shutil.move(jfile, os.path.join(v[0], 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
             if self.filesDictCR2 != {}:
-                for cfile in self.filesDictCR2[i+1]:
+                for cfile in self.filesDictCR2[i+1]: #we have to assume SmartShooter batch started at 0001
                     lsplit = os.path.basename(cfile).split('_')
-                    shutil.move(cfile, os.path.join(v, 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
+                    shutil.move(cfile, os.path.join(v[0], 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
                         
-
+            lNewXML = self.mSession.GenerateXML(v)
             
-        self.activeTakeName = []
+        self.activeTakeNames = []
         self.filesDictJPG = {}
         self.filesDictCR2 = {}
         

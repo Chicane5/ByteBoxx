@@ -29,6 +29,7 @@ class DataTake(object):
     def __init__(self, pPath):
         self.mPath = pPath
         self.mBatchJobs = []
+        self.mBatchJobsParams = {}
         self.mBatchVersions = {}
         
     def BindXML(self):
@@ -73,7 +74,6 @@ class DataTake(object):
             self.mBatchVersions[lChildElem.tag] = [lChildElem.text, lChildElem.attrib['file']] if 'file' in lChildElem.attrib.keys() else [lChildElem.text]  
             
             
-            
 #=======================================================================
 # 
 #=======================================================================
@@ -92,6 +92,9 @@ class MeshTake(DataTake):
         #super(MeshTake, self).popBatchJobs()
         self.mBatchJobs.extend(psbatchjobs.PSBatchJobs.cBATCH_TASKS) 
         self.mBatchJobs.extend(mybatchjobs.MYBatchJobs.cBATCH_TASKS)
+        #paramters
+        for d in (psbatchjobs.PSBatchJobs.cBATCH_PARAMS, mybatchjobs.MYBatchJobs.cBATCH_PARAMS):
+            self.mBatchJobsParams.update(d)
         
 #=======================================================================
 # 
@@ -141,58 +144,37 @@ class Session(object):
     def setActiveTakePath(self, pPath):
         self.mActiveTakePath = pPath
         
-    '''
-    def moveImages(self):
-        
-        after images land in the global shot directory bucket
-        we move them into the active take path. Sanity checks how many images we expect to copy
-        
-        lFinished = 0
-        count = 0
-        while not lFinished:
-            for newImage in os.listdir(self.mRootFolder):
-                root, ext = os.path.splitext(newImage)
-                if ext in ('.jpg', '.JPG', '.jpeg', '.JPEG', ):
-                    shutil.move(os.path.join(self.mRootFolder, newImage), os.path.join(self.mActiveTakePath, 'jpg'))
-                    count = count + 1
-                elif ext in ('.cr2', '.CR2'):
-                    shutil.move(os.path.join(self.mRootFolder, newImage), os.path.join(self.mActiveTakePath, 'cr2'))
-                    count = count + 1
-            lFinished = 1
-        return count
-    '''
-        
-    def GenerateXML(self, pCommentStr):
+
+    def GenerateXML(self, pTakePath_and_Comment):
         '''
-        once we have copied all the images over to the proper take directory, we need to generate some
-        meta data about this trigger
+        creates post session XML files when flushing to dumpster - batch steps, comments and META info
         '''
-        #check for jpg and cr2?
-        lJpgList, lCr2List = [], []
-        if os.path.exists(os.path.abspath(os.path.join(self.mActiveTakePath, 'jpg'))):
-            lJpgList = [j for j in os.listdir(os.path.join(self.mActiveTakePath, 'jpg'))]
-        if os.path.exists(os.path.abspath(os.path.join(self.mActiveTakePath, 'cr2'))):
-            lCr2List = [c for c in os.listdir(os.path.join(self.mActiveTakePath, 'cr2'))]
+        #check for jpg and cr2
+        lJpgs, lCr2s = False, False
+        if os.path.exists(os.path.abspath(os.path.join(pTakePath_and_Comment[0], 'jpg'))):
+            lJpgs = True
+        if os.path.exists(os.path.abspath(os.path.join(pTakePath_and_Comment[0], 'cr2'))):
+            lCr2s = True
                 
-        #assuming jpgs are alwasy shot after this point
-        if not lJpgList:
-            return False
+        jpglist = []
+        while jpglist == []:
+            jpglist = [x for x in os.listdir(os.path.abspath(os.path.join(pTakePath_and_Comment[0], 'jpg')))]
         
-        lJpgList.sort()
         lTakeRootEl = ET.Element("take")
         lImagesEl = ET.SubElement(lTakeRootEl, "images")
         lJpgEl = ET.SubElement(lImagesEl, "jpeg")
         lCr2El = ET.SubElement(lImagesEl, "cr2")
-        lJpgEl.text = "1"
+        
+        lJpgEl.text = "1" #assuming there are jpegs
         
         #are there cr2s in addition to the jpegs
-        if lCr2List:
+        if lCr2s:
             lCr2El.text = "1"
         else:
             lCr2El.text = "0"
             
         #exif stuff
-        lMeta = Meta(os.path.join(self.mActiveTakePath,'jpg', lJpgList[0]), ['Exif.Photo.ExposureTime','Exif.Photo.FNumber','Exif.Photo.ColorSpace'])
+        lMeta = Meta(os.path.join(pTakePath_and_Comment[0], 'jpg', jpglist[0]), ['Exif.Photo.ExposureTime','Exif.Photo.FNumber','Exif.Photo.ColorSpace'])
         lMeta.GetAllMeta()
         lExifEl = ET.SubElement(lTakeRootEl, "exif")
         lColourSpaceEl = ET.SubElement(lExifEl, "colourspace")
@@ -210,10 +192,10 @@ class Session(object):
         #extra
         lExtraEl = ET.SubElement(lTakeRootEl, "extra")
         lCommentEl = ET.SubElement(lExtraEl, "comment")
-        if pCommentStr == "":
+        if str(pTakePath_and_Comment[1]) == "":
             lCommentEl.text = "empty"
         else:
-            lCommentEl.text = pCommentStr
+            lCommentEl.text = str(pTakePath_and_Comment[1])
         
         #batch stuff - will differ for session types
         lBatchEl = ET.SubElement(lTakeRootEl, "batch")
@@ -235,7 +217,8 @@ class Session(object):
         '''
                 
         tree = ET.ElementTree(lTakeRootEl)
-        tree.write(os.path.join(self.mActiveTakePath, 'bb_takeInfo.xml'))
+        lfiletoXML = os.path.join(pTakePath_and_Comment[0], 'bb_takeInfo.xml') 
+        tree.write(lfiletoXML)
         
         return True
     

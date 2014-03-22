@@ -5,6 +5,7 @@ Created on 11 Mar 2014
 '''
 
 from __future__ import absolute_import
+from celery.contrib.methods import task_method
 
 import os
 
@@ -13,12 +14,13 @@ from app.pscan import psbatchjobs
 #from app.maya import mybatchjobs
 
 
-
-@app.task
-def align(label, photodir, accuracy):
-    psb = psbatchjobs.PSBatchJobs()
-    lfile = psb.align(label, photodir, accuracy)
-    return lfile
+class Align(object):
+    
+    @app.task(filter=task_method)
+    def align(self, label, photodir, accuracy):
+        psb = psbatchjobs.PSBatchJobs()
+        lfile = psb.align(label, photodir, accuracy)
+        return lfile
     
     
 @app.task

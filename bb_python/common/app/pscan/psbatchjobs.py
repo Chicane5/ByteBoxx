@@ -5,7 +5,10 @@ Created on 11 Mar 2014
 '''
 import getpass
 import os
+#from celery.contrib.methods import task_method
+#from cascelery.celery import app
 
+    
 class PSBatchJobs(object):
     '''
     cunting photoscan wont accept command line py scripts so we have to
@@ -21,10 +24,16 @@ class PSBatchJobs(object):
                     'geotexbuild',
                     'modelexport']
     
+    cBATCH_PARAMS = {'automask':[('mask directory:',''), ('blur:',10), ('threshold:',75), ('gapfill:',25)],
+                    'align':[('accuracy:','low')],
+                    'builddensecloud':[],
+                    'geotexbuild':[],
+                    'modelexport':[]}
+    
     def __init__(self):
         pass
     
- 
+    #@app.task(filter=task_method)
     def align(self, label, photodir, accuracy):
         tempfile = os.path.abspath(os.path.join(os.path.dirname(photodir), "align.py"))
         with open(tempfile, 'w') as fh:

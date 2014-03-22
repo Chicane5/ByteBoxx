@@ -11,7 +11,7 @@ from celery import Celery
 app = Celery('cascelery',
              broker='amqp://',
              backend='amqp://',
-             include=['cascelery.tasks'])
+             include=['cascelery.tasks','app.pscan.psbatchjobs'])
 
 # Optional configuration, see the application user guide.
 app.conf.update(
