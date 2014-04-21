@@ -26,7 +26,7 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
     classdocs
     '''
     cROW_HEIGHT = 38
-    cLINE_EDIT_MIN_WIDTH = 120
+    cLINE_EDIT_MIN_WIDTH = 35
     
     def __init__(self,parent=None):
         super(DL_bbRenderBoxxQueue, self).__init__(parent)
@@ -46,7 +46,8 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
 
         self.tableWidget_queue.setRowCount(len(self.mTakeList)) #the amount of takes we have in the queue
         self.tableWidget_queue.setColumnCount(len(self.mTakeList[0].mBatchJobs)+1)
-        self.tableWidget_queue.setHorizontalHeaderLabels(['path']+self.mTakeList[0].mBatchJobs+['priority'])
+        ljobsName = [j.mJobName for j in self.mTakeList[0].mBatchJobs]
+        self.tableWidget_queue.setHorizontalHeaderLabels(['path']+ljobsName+['priority'])
         
         for lTkRow in range(len(self.mTakeList)):
             #set the path
@@ -58,9 +59,6 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
             for index,value in enumerate(self.mTakeList[lTkRow].mBatchJobs):
                 
                 
-                #create the object
-                #lobj = castasks
-                #self.mTakeList[lTkRow].
                 #do all the widget stuff :/
                 lWidgetNew = QtGui.QWidget()
                 lHLayout = QtGui.QHBoxLayout()
@@ -68,42 +66,35 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
                 lCheckNew = QtGui.QCheckBox()
                 self.connect(lCheckNew, QtCore.SIGNAL("stateChanged (int)"), self._checkUpdated)
                 
-                lCheckNew.setText(self.mTakeList[lTkRow].mBatchVersions[value][0]) #pull the current version from the take's dictionary
+                lCheckNew.setText(self.mTakeList[lTkRow].mBatchVersions[value.mJobName][0]) #pull the current version from the take's dictionary
                 lFieldNew = QtGui.QLineEdit()
                 try:
-                    lFieldNew.setText(self.mTakeList[lTkRow].mBatchVersions[value][1])
+                    lFieldNew.setText(self.mTakeList[lTkRow].mBatchVersions[value.mJobName][1])
                 except IndexError:
                     lFieldNew.setText("no file")
                 lFieldNew.setMinimumWidth(DL_bbRenderBoxxQueue.cLINE_EDIT_MIN_WIDTH)
                 #-
                 lButBseNew = QtGui.QPushButton() #do we want to look up to an older batch version
-                lButBseNew.setText("prev version")
+                lButBseNew.setText("prev...")
                 self.connect(lButBseNew, QtCore.SIGNAL("clicked()"), self._getFile)
+                
+                lButParamNew = QtGui.QPushButton()
+                lButParamNew.setText("params...")
+                self.connect(lButParamNew, QtCore.SIGNAL("clicked()"), value.showParams)
+                #value.setDlgParent(self)
                 
                 #dump in the layout
                 lHLayout.addWidget(lCheckNew)
                 lHLayout.addWidget(lFieldNew)
                 lHLayout.addWidget(lButBseNew)
-                
-                paramlabel, paramdial = None, None
-                for param_and_default in self.mTakeList[lTkRow].mBatchJobsParams[value]:
-                    paramlabel = QtGui.QLabel(param_and_default[0])
-                    if isinstance(param_and_default[1], str):
-                        paramdial = QtGui.QLineEdit()
-                        paramdial.setText(param_and_default[1])
-                    elif isinstance(param_and_default[1], int): 
-                        paramdial = QtGui.QSpinBox()
-                        paramdial.setValue(param_and_default[1])
-                        
-                    paramdial.setParent(paramlabel)
-                    lHLayout.addWidget(paramlabel)
-                    lHLayout.addWidget(paramdial)
-                
+                lHLayout.addWidget(lButParamNew)
+
                 lHLayout.layout()
                 lWidgetNew.setLayout(lHLayout)
                 
                 self.tableWidget_queue.setCellWidget(lTkRow,index+1,lWidgetNew)
                 self.tableWidget_queue.setRowHeight(lTkRow, DL_bbRenderBoxxQueue.cROW_HEIGHT)
+                self.tableWidget_queue.resizeColumnsToContents()
         
             #priority
             
@@ -125,7 +116,9 @@ class DL_bbRenderBoxxQueue(QtGui.QDialog, queueuifile.Ui_Dialog_bbRenderBoxx_que
             #pyfile = castasks.align.delay(os.path.basename(str(rendertake.mPath)), os.path.join(str(rendertake.mPath), 'jpg'), 'low')
             #time.sleep(1.5)
             #castasks.runInPhotoScan.delay(pyfile.get())
+            
 
+        
 #===============================================================================
 # 
 #===============================================================================
@@ -232,9 +225,9 @@ class MW_bbRenderBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbRenderBoxx):
                 
             #what take type are we dealing with
             if self.mRootPath.endswith('_Mesh'):
-                lProcTake = MeshTake(lPath)
+                lProcTake = MeshTake(lPath) #create new SS.MeshTake
             elif self.mRootPath.endswith('_Texture'):
-                lProcTake = TextureTake(lPath)
+                lProcTake = TextureTake(lPath) #create new SS.TexTake
             if lNeedXML:
                 #create it
                 pass

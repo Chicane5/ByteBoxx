@@ -29,8 +29,9 @@ class DataTake(object):
     def __init__(self, pPath):
         self.mPath = pPath
         self.mBatchJobs = []
-        self.mBatchJobsParams = {}
+        #self.mBatchJobsParams = {}
         self.mBatchVersions = {}
+        self.mPriority = 1
         
     def BindXML(self):
         '''
@@ -90,11 +91,17 @@ class MeshTake(DataTake):
         populate batch jobs specific to mesh processing
         '''
         #super(MeshTake, self).popBatchJobs()
-        self.mBatchJobs.extend(psbatchjobs.PSBatchJobs.cBATCH_TASKS) 
-        self.mBatchJobs.extend(mybatchjobs.MYBatchJobs.cBATCH_TASKS)
+        #self.mBatchJobs.extend(psbatchjobs.PSBatchJobs.cBATCH_TASKS) 
+        #self.mBatchJobs.extend(mybatchjobs.MYBatchJobs.cBATCH_TASKS)
         #paramters
-        for d in (psbatchjobs.PSBatchJobs.cBATCH_PARAMS, mybatchjobs.MYBatchJobs.cBATCH_PARAMS):
-            self.mBatchJobsParams.update(d)
+        
+        #add an instance of each task to the list of tasks for this take
+        self.mBatchJobs.append(psbatchjobs.JobMask())
+        self.mBatchJobs.append(psbatchjobs.JobAlign())
+        
+        
+        #for d in (psbatchjobs.PSBatchJobs.cBATCH_PARAMS, mybatchjobs.MYBatchJobs.cBATCH_PARAMS):
+            #self.mBatchJobsParams.update(d)
         
 #=======================================================================
 # 
@@ -272,11 +279,14 @@ class SetSession(Session):
     def updateActivePath(self):
         super(SetSession, self).updateActivePath(os.path.join(self.mSubjectName, self.mCharacterName, self.mDefinition, self.mPose))
 
+
 #===============================================================================
 # 
 #===============================================================================
 class FlexSession(Session):
-    
+    '''
+    flexible data container, for testing or fast iteration shoots
+    '''
     def __init__(self, *args):
         super(FlexSession, self).__init__(*args)
         self.mBucket = ''

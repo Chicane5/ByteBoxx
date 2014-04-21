@@ -45,6 +45,7 @@ class DirectoryPeriodCheck(QtCore.QObject):
         self.dirToWatch = dir
         self.filesDictJPG = {} #holds all the new jpg files in dumpster 
         self.filesDictCR2 = {} #holds all the new cr2 files in dumpster
+        self.mErrors = []
         
         self.FILE_LIST_DIRECTORY = 0x0001
 
@@ -74,15 +75,23 @@ class DirectoryPeriodCheck(QtCore.QObject):
             
             
             if results:
+                #files have dropped into the bucket, iterate through to file into dicts
                 for res in results:
                     if res[0] == 1:
                         root, ext = os.path.splitext(res[1])
                         if any(imagefile in ext for imagefile in gCOMBINED_FILES):
                             
+                            #make sure we are dealing with the following convention from SmartCrap:
+                            #CAMERANAME_DATE_BATCHNUMBER eg AL01_20140101_0001
+                            rsplit = root.split('_')
+                            if len(rsplit) != 3:
+                                if res[1] not in self.mErrors:
+                                    self.mErrors.append(res[1])
+                                continue
+                            
+                            #what is this batchnumber?
                             thistrigger = int(root.split('_')[2])
-
-                                    
-                            #triggers past the first        
+            
                             if any(jp in ext for jp in gJPGXTNS):
                                 if thistrigger not in self.filesDictJPG.keys():
                                     self.filesDictJPG[thistrigger] = []
@@ -92,13 +101,16 @@ class DirectoryPeriodCheck(QtCore.QObject):
                                     self.filesDictCR2[thistrigger] = []
                                 self.filesDictCR2[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
                             
-            #print len(self.filesDictJPG[thistrigger])
+
             self.updateDictionaries()
             time.sleep(0.5)
             
     def updateDictionaries(self):
         self.emit(QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.filesDictJPG)
         self.emit(QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.filesDictCR2)
+        if self.mErrors:
+            self.emit(QtCore.SIGNAL("errorNotify(PyQt_PyObject)"), self.mErrors)
+
 
 #===============================================================================
 # 
@@ -190,12 +202,13 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         #attrs
         self.filesDictJPG = {}
         self.filesDictCR2 = {}
+        self.mErrorList = []
         self.activeTakeNames = []
 
         self.watcher = watcher
         self.connect(watcher, QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.updatefilesDictJPG)
         self.connect(watcher, QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.updatefilesDictCR2)
-
+        self.connect(watcher, QtCore.SIGNAL("errorNotify(PyQt_PyObject)"), self.updateErrors)
         
     def _main(self):
         self.show()
@@ -203,7 +216,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         #load/create a config file
         self.checkConfig()
         
-
     def checkConfig(self):
         if not os.environ.get(gCONFIG_VAR):
             popup.Popup.critical(self, "No $TRIGGERBOXX_CONFIG variable set\nPlease set and retry")
@@ -230,7 +242,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         except:
             popup.Popup.critical(self, "Fatal! Could not open COM port")
             
-   
     def populateDefaults(self, pLines):
         for line in pLines:
             if line.startswith('photodir'):
@@ -250,8 +261,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 lSplit = line.split(' ')
                 self.doubleSpinBox_flash.setValue(float(lSplit[1].rstrip()))
                 
-            
-
     def populateFields(self):
         if self.mSession.__class__ == FlexSession:
             self.lineEdit_bucket.setText(self.mSession.mBucket)
@@ -365,6 +374,11 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
     def updatefilesDictCR2(self, adict):
         self.filesDictCR2 = adict
         
+    def updateErrors(self, errorList):
+        for e in errorList:
+            if e not in self.mErrorList:
+                self.mErrorList.append(e)
+        
     def CheckSerialComms(self):
         try:
             assert 'mSerial' in self.__dict__
@@ -415,29 +429,47 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         '''
         we need to flush everything from Dumpster and create XML info for each take
         '''
-        for i, v in enumerate(self.activeTakeNames):
-
-            if self.filesDictJPG != {}:
-                for jfile in self.filesDictJPG[i+1]: #we have to assume SmartShooter batch started at 0001
-                    lsplit = os.path.basename(jfile).split('_')
-                    shutil.move(jfile, os.path.join(v[0], 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
-            if self.filesDictCR2 != {}:
-                for cfile in self.filesDictCR2[i+1]: #we have to assume SmartShooter batch started at 0001
-                    lsplit = os.path.basename(cfile).split('_')
-                    shutil.move(cfile, os.path.join(v[0], 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
-                        
-            lNewXML = self.mSession.GenerateXML(v)
-            
-        self.activeTakeNames = []
-        self.filesDictJPG = {}
-        self.filesDictCR2 = {}
+        if self.activeTakeNames == []:
+            popup.Popup.warning(self, "Nothing to Copy!")
+            return
+        try:
+            for i, v in enumerate(self.activeTakeNames):
+    
+                if gDEBUG:
+                    print v
+                    
+                if self.filesDictJPG != {}:
+                    for jfile in self.filesDictJPG[i+1]: #we have to assume SmartShooter batch started at 0001
+                        lsplit = os.path.basename(jfile).split('_')
+                        shutil.move(jfile, os.path.join(v[0], 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
+                if self.filesDictCR2 != {}:
+                    for cfile in self.filesDictCR2[i+1]: #we have to assume SmartShooter batch started at 0001
+                        lsplit = os.path.basename(cfile).split('_')
+                        shutil.move(cfile, os.path.join(v[0], 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
+                            
+                lNewXML = self.mSession.GenerateXML(v)
+                
+            self.activeTakeNames = []
+            self.filesDictJPG = {}
+            self.filesDictCR2 = {}
+    
+            if self.mErrorList:
+                sortmedir = os.path.join(os.path.dirname(str(self.lineEdit_photoDownload.text())), 'tosort')
+                if not os.path.exists(sortmedir):
+                    os.makedirs(sortmedir)
+                popup.Popup.warning(self, "{0} appears to have bad naming, check SmartShooter. Ignoring".format(','.join(self.mErrorList)))
+                for errorFile in self.mErrorList:
+                    shutil.move(os.path.join(str(self.lineEdit_photoDownload.text()), errorFile), sortmedir)
+        except:
+            popup.Popup.warning(self, "Error moving some files to take directories - check dumpster dir.")
+        
         
     def closeEvent(self, event):
         #try and pickle the session for later
         with open(os.path.join(self.mSession.mShootFolder, gSESSION_FILE), 'w') as fh:
             pickle.dump(self.mSession, fh)
             
-            
+
 #------------------------------------------------------------------------------ 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)

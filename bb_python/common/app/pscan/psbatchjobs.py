@@ -3,12 +3,19 @@ Created on 11 Mar 2014
 
 @author: ByteBoxx
 '''
+#builtins
 import getpass
 import os
-#from celery.contrib.methods import task_method
-#from cascelery.celery import app
+#3rd
+#user
+from PyQt4.QtCore import QObject, SIGNAL
+from qt import rendertaskdlgs
 
-    
+gDEBUG = True
+
+#===============================================================================
+# 
+#===============================================================================
 class PSBatchJobs(object):
     '''
     cunting photoscan wont accept command line py scripts so we have to
@@ -31,8 +38,12 @@ class PSBatchJobs(object):
                     'modelexport':[]}
     
     def __init__(self):
-        pass
-    
+        self.mBatchParamsDlg = None
+        self.mJobName = None
+
+    def showParams(self):
+        self.mBatchParamsDlg._main()
+        
     #@app.task(filter=task_method)
     def align(self, label, photodir, accuracy):
         tempfile = os.path.abspath(os.path.join(os.path.dirname(photodir), "align.py"))
@@ -66,7 +77,82 @@ class PSBatchJobs(object):
     
     def runInPhotoScan(self, script):
         return '"' + os.path.join(self.cBAT_DIR, 'copyToPSScripts.bat') +'" ' + script
+    
+    
+#===============================================================================
+# 
+#===============================================================================
+class JobMask(PSBatchJobs):
+    def __init__(self):
+        super(JobMask, self).__init__()
+        self.mBatchParamsDlg  = rendertaskdlgs.DL_AutoMask_Params()
+        self.mJobName = 'automask'
+        #parameters
+        self.maskDirectory = ''
+        self.blur = 10
+        self.threshold = 75
+        self.gapfill = 25
         
+        #parameter connections
+        QObject.connect(self.mBatchParamsDlg.lineEdit_maskPath, SIGNAL("textEdited (QString)"), self.updatePath)
+        QObject.connect(self.mBatchParamsDlg.spinBox_blur, SIGNAL("valueChanged (int)"), self.updateBlur)
+        QObject.connect(self.mBatchParamsDlg.spinBox_threshold, SIGNAL("valueChanged (int)"), self.updateThreshold)
+        QObject.connect(self.mBatchParamsDlg.spinBox_gapfill, SIGNAL("valueChanged (int)"), self.updateGapfill)
+        
+
+    def updatePath(self, pQString):
+        self.maskDirectory = str(pQString)
+        if gDEBUG:
+            print self.maskDirectory
+        
+    
+    def updateBlur(self, pValue):
+        self.blur = pValue
+        if gDEBUG:
+            print self.blur
+            
+    def updateThreshold(self, pValue):
+        self.threshold = pValue
+        if gDEBUG:
+            print self.threshold
+            
+    def updateGapfill(self, pValue):
+        self.gapfill = pValue
+        if gDEBUG:
+            print self.gapfill
+        
+        
+#==========================================================================
+# 
+#==========================================================================
+class JobAlign(PSBatchJobs):
+    def __init__(self):
+        super(JobAlign, self).__init__()
+        self.mBatchParamsDlg  = rendertaskdlgs.DL_Align_Params()
+        self.mJobName = 'align'
+        #parameters
+        self.accuracy = 'low'
+        self.pairPreselect = 'disabled'
+        self.pointLimit = 40000
+        self.constrainByMask = False
+        
+        #parameter connections
+        QObject.connect(self.mBatchParamsDlg.comboBox_accuracy, SIGNAL("currentIndexChanged (QString)"), self.updateAccuracy)
+        QObject.connect(self.mBatchParamsDlg.comboBox_consbymask, SIGNAL("currentIndexChanged (QString)"), self.updateConstrainMask)
+
+    def updateAccuracy(self, pQString):
+        self.accuracy = str(pQString)
+        if gDEBUG:
+            print self.accuracy
+    
+    def updateConstrainMask(self, pQString):
+        if pQString == 'no':
+            self.constrainByMask = False
+        elif pQString == 'yes':
+            self.constrainByMask = True
+        if gDEBUG:
+            print self.constrainByMask
+
         
 if __name__ == "__main__":
     psb = PSBatchJobs()

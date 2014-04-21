@@ -13,12 +13,10 @@ import os, sys
 class MYBatchJobs(object):
     
     cBATCH_TASKS = ['scanassembly',
-                    'batchrender',
-                    'webglexport']
+                    'batchrender']
     
     cBATCH_PARAMS = {'scanassembly':[],
-                    'batchrender':[],
-                    'webglexport':[]}
+                    'batchrender':[]}
     
     def __init__(self):
         pass
