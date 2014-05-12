@@ -28,8 +28,6 @@ from smartshooter.session import  FlexSession
 from util import makepy2exe
 
 #globals
-#gCONFIG_VAR = 'TRIGGERBOXX_CONFIG'
-#gCONFIG_FILE = 'triggerboxx_defaults.txt'
 gSESSION_FILE = 'session.tbs'
 gTAKEDIR_PREFIX = 'tk'
 gJPGXTNS = ['jpg', 'JPG', 'jpeg', 'JPEG']
@@ -82,7 +80,7 @@ def enumerate_serial_ports():
 class DirectoryPeriodCheck(QtCore.QObject):
     '''
     This object constantly monitors our chosen photodownload directory for changes, and communicates
-    them back to our image mover object
+    to image mover when there is something new to move
     '''
     def __init__(self):
         super(DirectoryPeriodCheck, self).__init__()
@@ -127,7 +125,7 @@ class DirectoryPeriodCheck(QtCore.QObject):
                 for res in results:
                     if res[0] == 1:
                         root, ext = os.path.splitext(res[1])
-                        if any(imagefile in ext for imagefile in gCOMBINED_FILES):
+                        if any(imagefile in ext for imagefile in gCOMBINED_FILES): #are these JPGs or CR2s?
                             
                             #make sure we are dealing with the following convention from SmartCrap:
                             #CAMERANAME_DATE_BATCHNUMBER eg AL01_20140101_0001
@@ -139,113 +137,190 @@ class DirectoryPeriodCheck(QtCore.QObject):
                             
                             #what is this batchnumber?
                             thistrigger = int(root.split('_')[2])
-                            #self.emit(QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), (thistrigger, os.path.join(self.dirToWatch, res[1])))
                             
                             if any(jp in ext for jp in gJPGXTNS):
                                 if thistrigger not in self.filesDictJPG.keys():
                                     self.filesDictJPG[thistrigger] = []
-                                self.filesDictJPG[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
-                                self.emit(QtCore.SIGNAL("updatingJPGs()"))
+                                #self.filesDictJPG[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
+                                self.emit(QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), (thistrigger, os.path.join(self.dirToWatch, res[1])))
                             elif any(cr in ext for cr in gCR2XTNS):
                                 if thistrigger not in self.filesDictCR2.keys():
                                     self.filesDictCR2[thistrigger] = []
-                                self.filesDictCR2[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
+                                #self.filesDictCR2[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
+                                self.emit(QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), (thistrigger, os.path.join(self.dirToWatch, res[1])))
                             
-            #if self.filesDictCR2 != {} or self.filesDictJPG != {}:
-                #self.updateDictionaries()
-            #time.sleep(0.5)
+                    #if self.mErrors:
+                        #self.emit(QtCore.SIGNAL("errorFiles()"))
             
-    def updateDictionaries(self):
-        self.emit(QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.filesDictJPG)
-        self.emit(QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.filesDictCR2)
-        if self.mErrors:
-            self.emit(QtCore.SIGNAL("errorNotify(PyQt_PyObject)"), self.mErrors)
 
 #===============================================================================
 # 
 #===============================================================================
 class ImageMovers(QtCore.QObject):
     '''
-    This object spins in a background thread and waits for notification of a new image set
+    This object waits for notification of additions to the watchers directory structures and starts to pull data from them
     '''
     def __init__(self, watcher):
         super(ImageMovers, self).__init__()
         
         self.watcher = watcher
-        self.takes = [] #tuple of (take path, empty list for images, comment)
-        self.filesDictJPG = {}
-        self.filesDictCR2 = {}
-        self.mErrorList = []
+        self.takes = [] #take list gets updated by MainGui whenever we fire off a new take
+        self.takesToJpgs = {}
+        self.takesToCR2s = {}
         
-        self.connect(self.watcher, QtCore.SIGNAL("updatingJPGs()"), self.updatefilesDictJPG)
-        #self.connect(self.watcher, QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.updatefilesDictCR2)
-        #self.connect(self.watcher, QtCore.SIGNAL("errorNotify(PyQt_PyObject)"), self.updateErrors)
+        self.timerJ = QtCore.QTimer() # jpg timer
+        self.timerC = QtCore.QTimer() #cr2 timer
+        self.timerJ.timeout.connect(self.moveJPG)
+        self.timerC.timeout.connect(self.moveCR2) 
         
-    #@pyqtSlot()
+        self.connect(self.watcher, QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.updatefilesDictJPG)
+        self.connect(self.watcher, QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.updatefilesDictCR2)
+        #self.connect(self.watcher, QtCore.SIGNAL("errorFiles()"), self.cacheErrors)
+        
+        
+        self.timerJ.start(3000)
+        self.timerC.start(3000)
+    
     def addToTakes(self, take):
+        print "got new take ", take
         self.takes.append(take)
-        print "in image movers thread, here's the takes ", self.takes
         
-    def updatefilesDictJPG(self):
+    def updatefilesDictJPG(self, batchNo_filePath):
         '''
-        tuple of trigger and image path
+        when this signal is received, we get tuple of index and path
         '''
-        #print "updating JPGs with ", adict
-        #self.filesDictJPG = adict
-        #for k,v in self.filesDictJPG.iteritems():
+        if batchNo_filePath[0] not in self.takesToJpgs.keys():
+            self.takesToJpgs[batchNo_filePath[0]] = []
+        if batchNo_filePath[1] not in self.takesToJpgs[batchNo_filePath[0]]:
+            self.takesToJpgs[batchNo_filePath[0]].append(os.path.abspath(batchNo_filePath[1]))
+            
+    def updatefilesDictCR2(self, batchNo_filePath):
+        '''
+        when this signal is received, we get tuple of index and path
+        '''
+        if batchNo_filePath[0] not in self.takesToCR2s.keys():
+            self.takesToCR2s[batchNo_filePath[0]] = []
+        if batchNo_filePath[1] not in self.takesToCR2s[batchNo_filePath[0]]:
+            self.takesToCR2s[batchNo_filePath[0]].append(os.path.abspath(batchNo_filePath[1]))
+        
+        
+    def moveJPG(self):
+        
+        
+        for k in self.takesToJpgs.keys():
+            print "key is ", k
+            index = int(k-1)
+            takePath = str(self.takes[index])
+            print "takePath is ", takePath
+            for j in self.takesToJpgs[k]:
+                print "jpg is ", j
+                lsplit = os.path.basename(j).split('_')
+                print "lsplit is ", lsplit
+                shutil.move(j, os.path.join(takePath, 'jpg', lsplit[0]+'_'+lsplit[1]+ '_'+lsplit[2] ))
+                if os.path.isfile(os.path.join(takePath, 'jpg', lsplit[0]+'_'+lsplit[1]+ '_'+lsplit[2] )):
+                    print "yes its a file, removing"
+                    self.takesToJpgs[k].remove(j)
+                    
+    def moveCR2(self):
+        
+        
+        for k in self.takesToCR2s.keys():
+            print "key is ", k
+            index = int(k-1)
+            takePath = str(self.takes[index])
+            print "takePath is ", takePath
+            for c in self.takesToCR2s[k]:
+                print "cr2 is ", c
+                lsplit = os.path.basename(c).split('_')
+                print "lsplit is ", lsplit
+                shutil.move(c, os.path.join(takePath, 'cr2', lsplit[0]+'_'+lsplit[1]+ '_'+lsplit[2]))
+                if os.path.isfile(os.path.join(takePath, 'cr2', lsplit[0]+'_'+lsplit[1]+ '_'+lsplit[2])):
+                    print "yes its a file, removing"
+                    self.takesToCR2s[k].remove(c)
+
+        """
         for i, v in enumerate(self.takes):
+            print i
             if i+1 in self.watcher.filesDictJPG.keys():
-                if self.watcher.filesDictJPG[i+1] != []:
+                print "key here" #make sure there is a valid key
+                if self.watcher.filesDictJPG[i+1] == []:
+                    print "empty"
+                    break
+                else:
                     while self.watcher.filesDictJPG[i+1] != []:
                         for jpg in self.watcher.filesDictJPG[i+1]:
                             try:
+                                print jpg
                                 lsplit = os.path.basename(jpg).split('_')
                                 shutil.move(jpg, os.path.join(str(v[0]), 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
                                 if os.path.isfile(os.path.join(str(v[0]), 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg')):
                                     self.watcher.filesDictJPG[i+1].remove(jpg)
-                            except IOError:
+                            except (IOError, WindowsError):
+                                print "fucking error"
                                 continue
-                        
-            
-    def _MoveEm(self, trigger_and_path, lsplit, trig):
-        if 'cr2' in trigger_and_path[1]:    
-            shutil.move(trigger_and_path[1], os.path.join(str(self.takes[trig-1][0]), 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
-        elif 'jpg' in trigger_and_path[1]:
-            shutil.move(trigger_and_path[1], os.path.join(str(self.takes[trig-1][0]), 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
         
-
-    """
-    def updatefilesDictCR2(self, adict):
-        print "updating CR2s with ", adict
-        self.filesDictCR2 = adict
-        
-    def updateErrors(self, errorList):
-        for e in errorList:
-            if e not in self.mErrorList:
-                self.mErrorList.append(e)
-    """
+                            
+    def updatefilesDictCR2(self):
+        '''
+        when this signal is received, we know that watcher has added more images to its interal CR2 structure
+        '''
+        print "got update CR2 signal"
+        for i, v in enumerate(self.takes):
+            if i+1 in self.watcher.filesDictCR2.keys(): #make sure there is a valid key
+                if self.watcher.filesDictCR2[i+1] != []:
+                    while self.watcher.filesDictCR2[i+1] != []:
+                        for cr2 in self.watcher.filesDictCR2[i+1]:
+                            try:
+                                lsplit = os.path.basename(cr2).split('_')
+                                shutil.move(cr2, os.path.join(str(v[0]), 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
+                                if os.path.isfile(os.path.join(str(v[0]), 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2')):
+                                    self.watcher.filesDictCR2[i+1].remove(cr2)
+                            except (IOError, WindowsError):
+                                continue
     
-#===============================================================================
+    def cacheErrors(self):
+        '''
+        when this signal is received we know there have been error files that dont match our convention,
+        we will attempt to move them to an intermediary directory to deal with later
+        '''
+        
+        if self.mErrorList:
+            sortmedir = os.path.join(os.path.dirname(str(self.lineEdit_photoDownload.text())), 'tosort')
+            if not os.path.exists(sortmedir):
+                os.makedirs(sortmedir)
+                popup.Popup.warning(self, "{0} appears to have bad naming, check SmartShooter. Ignoring".format(','.join(self.mErrorList)))
+                for errorFile in self.mErrorList:
+        shutil.move(os.path.join(str(self.lineEdit_photoDownload.text()), errorFile), sortmedir)
+        
+        pass
+        """
+     
+#==============================================================================
 # 
 #===============================================================================
 class SerialMonitor(QtCore.QObject):
     '''
+    The serial monitor spins in another seperate thread and listens for the Arduino writing back to the PC -
+    in this case we want to emit the signal we have been triggered from cable and fire off a take as usal
     '''
     def __init__(self):
         super(SerialMonitor, self).__init__()
         self.mSerial = None
         
-    #@pyqtSlot()
     def updateSerialPort(self, serial):
+        '''
+        shared reference to the serial.Serial class from the MainGUI
+        '''
         self.mSerial = serial
     
     @pyqtSlot()  
     def monitor(self):
         while True:
-            val = self.mSerial.read(1)
+            val = self.mSerial.read(1) #read a byte from the serial port
             if val == 'c':
                 self.emit(QtCore.SIGNAL("cableTrigger()"))
             time.sleep(1.5)
+ 
      
 #===============================================================================
 # 
@@ -279,29 +354,19 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         #action connections
         self.connect(self.actionMesh, QtCore.SIGNAL("triggered()"), self.newProject)
         self.connect(self.actionTexture, QtCore.SIGNAL("triggered()"), self.newProject)
-        
-        
-        #self.connect(self.actionCopyNow, QtCore.SIGNAL("triggered()"), self.copyFromDumpster) ?DEPR
         self.connect(self.actionLoad_Project, QtCore.SIGNAL("triggered()"), self.loadProject)
         self.connect(self.actionSave_Project, QtCore.SIGNAL("triggered()"), self.saveProject)
-                     
-        #edits/spinners/checks
-        #self.connect(self.lineEdit_pose, QtCore.SIGNAL("returnPressed()"), self.updatePose) DEPR
         self.connect(self.actionNewShootday, QtCore.SIGNAL("triggered()"), self.updateShootDay)
-        self.connect(self.lineEdit_bucket, QtCore.SIGNAL("returnPressed()"), self.updateBucket)
         
+        self.connect(self.lineEdit_bucket, QtCore.SIGNAL("returnPressed()"), self.updateBucket)
         
         #main buttons
         self.connect(self.pushButton_fire, QtCore.SIGNAL("clicked()"), self.fireArray)
         self.connect(self.pushButton_prime, QtCore.SIGNAL("clicked()"), self.primeArray)
         
         #attrs
-        #self.filesDictJPG = {}
-        #self.filesDictCR2 = {}
-        #self.mErrorList = []
-        #self.activeTakeNames = []
-        
-        self.mSession = None #the main session for this run
+        self.batchCounter = 1
+        self.mSession = None #the main session for this run __smartshooter.session.FlexSession__
 
         #directory watcher & serial port stuffz
         self.watcher = watcher
@@ -321,7 +386,8 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
         self.logger = logging.getLogger(__name__)   
         
-        QtGui.QTextEdit.write = write  
+        QtGui.QTextEdit.write = write #enable logging to TextBox 
+        self.lcdNumber_countdown.display(self.batchCounter) 
         
     def _main(self):
         self.show()
@@ -347,6 +413,9 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.srmonitor_thread.start()
         self.watcher_thread.start()
         self.imageMover_thread.start()
+        
+        #remind to reset smart shooter shit
+        popup.Popup.critical(self, "REMEMBER TO RESET SMART SHOOTER BATCH TO 0001, CONVENTION: $CAM_$DATE_$BATCH")
             
         
     def findPort(self, baud):
@@ -359,55 +428,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 continue
         return sr
         
-    '''
-    DEPR
-    def checkConfig(self):
-        if not os.environ.get(gCONFIG_VAR):
-            popup.Popup.critical(self, "No $TRIGGERBOXX_CONFIG variable set\nPlease set and retry")
-            self.close()
-        else:
-            #try to load a preset
-            try:
-                with open(os.path.join(os.environ.get(gCONFIG_VAR),gCONFIG_FILE), "r") as lFile:
-                    lLines = lFile.readlines()
-                    self.populateDefaults(lLines)                            
-            except IOError:
-                popup.Popup.warning(self, "Couldn't find a default config file\nOK to create one now")
-                lConfigurator = DL_bbTriggerBoxxConfig(self)
-                lConfigurator._main()
-    '''
-    '''
-    DEPR       
-    def editPrefs(self):
-        lConfigurator = DL_bbTriggerBoxxConfig(self)
-        lConfigurator._main()
-    '''         
-
-    '''
-    DEPR
-    def populateDefaults(self, pLines):
-        for line in pLines:
-            if line.startswith('photodir'):
-                lSplit = line.split(' ')
-
-            elif line.startswith('jpg'):
-                lSplit = line.split(' ')
-                #self.checkBox_jpg.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip())) DEPR
-            elif line.startswith('cr2'):
-                lSplit = line.split(' ')
-                #self.checkBox_cr2.setCheckState(QtCore.Qt.CheckState(lSplit[1].rstrip())) DEPR
-            elif line.startswith('focus'):
-                lSplit = line.split(' ')
-                #self.doubleSpinBox_focus.setValue(float(lSplit[1].rstrip())) DEPR
-            elif line.startswith('flash'):
-                lSplit = line.split(' ')
-                #self.doubleSpinBox_flash.setValue(float(lSplit[1].rstrip())) DEPR
-    '''
-       
     def populateFields(self):
         self.lineEdit_shootday.setText(self.mSession.mShootDay)
         self.lineEdit_bucket.setText(self.mSession.mBucket)
-            
+    
     def newProject(self):
         #create a smartShooter project instance, either mesh or texture - paremeters type and root folder
 
@@ -422,7 +446,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         lFolderName = str(popup.Input.getText(self, "Enter Project Root Name")[0])
         lProjectFolder = os.path.join(os.path.dirname(self.mSession.mRootFolder), lFolderName + '_' + self.mSession.mType)
         
-
         if not os.path.exists(os.path.abspath(lProjectFolder)):
             os.makedirs(lProjectFolder)
         self.mSession.mShootFolder = lProjectFolder
@@ -463,8 +486,11 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             
             #work out the previous take and increment by 1
             lTakeFolder = os.path.basename(self.mSession.mActiveTakePath)
-            self.spinBox_take.setValue(int(lTakeFolder.lstrip('tk')) + 1)
-            
+            if lTakeFolder:
+                self.spinBox_take.setValue(int(lTakeFolder.lstrip('tk')) + 1)
+            else:
+                self.spinBox_take.setValue(1)
+                
             self.lineEdit_projectRoot.setText(self.mSession.mShootFolder)
             self.populateTreeView()
             self.logger.info("loaded project from {0}".format(self.mSession.mShootFolder))
@@ -507,18 +533,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         root = model.setRootPath(self.mSession.mShootFolder)
         self.treeView_diskMap.setModel(model)
         self.treeView_diskMap.setRootIndex(root)
-        
-    def updatefilesDictJPG(self, adict):
-        self.filesDictJPG = adict
-        
-    def updatefilesDictCR2(self, adict):
-        self.filesDictCR2 = adict
-        
-    def updateErrors(self, errorList):
-        for e in errorList:
-            if e not in self.mErrorList:
-                self.mErrorList.append(e)
-        
+                
     def CheckSerialComms(self):
         try:
             assert 'mSerial' in self.__dict__
@@ -561,6 +576,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                 os.makedirs(os.path.join(self.mSession.mActiveTakePath, 'jpg'))
                 os.makedirs(os.path.join(self.mSession.mActiveTakePath, 'cr2'))
                 
+                #create a text document for comment
+                with open(os.path.join(self.mSession.mActiveTakePath, 'comment.txt'), 'w') as fh:
+                    fh.write(str(self.lineEdit_comment.text()))
+                
                 self.logger.info("created take directory {0}".format(self.mSession.mActiveTakePath))
             except:
                 popup.Popup.warning(self, "Error creating take directory, check permission")
@@ -569,67 +588,27 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.mSerial.write('a')
             
             #update our active take names
-            #self.activeTakeNames.append((self.mSession.mActiveTakePath, self.lineEdit_comment.text()))  DEPR
-            self.emit(QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), (self.mSession.mActiveTakePath, [], self.lineEdit_comment.text()))
+            self.emit(QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), self.mSession.mActiveTakePath)
             #increment take?
             if self.checkBox_inc.isChecked():
                 self.spinBox_take.setValue(self.spinBox_take.value() + 1)
                 
             self.lineEdit_comment.clear()
+            self.batchCounter+=1
+            self.lcdNumber_countdown.display(self.batchCounter)
             
-    """ DEPR
-    def copyFromDumpster(self):
-        '''
-        we need to flush everything from Dumpster and create XML info for each take
-        '''
-        if self.activeTakeNames == []:
-            popup.Popup.warning(self, "Nothing to Copy!")
-            return
-        try:
-            for i, v in enumerate(self.activeTakeNames):
-    
-                if gDEBUG:
-                    print v
-                    
-                if self.filesDictJPG != {}:
-                    for jfile in self.filesDictJPG[i+1]: #we have to assume SmartShooter batch started at 0001
-                        lsplit = os.path.basename(jfile).split('_')
-                        shutil.move(jfile, os.path.join(v[0], 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
-                if self.filesDictCR2 != {}:
-                    for cfile in self.filesDictCR2[i+1]: #we have to assume SmartShooter batch started at 0001
-                        lsplit = os.path.basename(cfile).split('_')
-                        shutil.move(cfile, os.path.join(v[0], 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
-                            
-                lNewXML = self.mSession.GenerateXML(v)
-                
-            self.activeTakeNames = []
-            self.filesDictJPG = {}
-            self.filesDictCR2 = {}
-    
-            if self.mErrorList:
-                sortmedir = os.path.join(os.path.dirname(str(self.lineEdit_photoDownload.text())), 'tosort')
-                if not os.path.exists(sortmedir):
-                    os.makedirs(sortmedir)
-                popup.Popup.warning(self, "{0} appears to have bad naming, check SmartShooter. Ignoring".format(','.join(self.mErrorList)))
-                for errorFile in self.mErrorList:
-                    shutil.move(os.path.join(str(self.lineEdit_photoDownload.text()), errorFile), sortmedir)
-        except:
-            popup.Popup.warning(self, "Error moving some files to take directories - check dumpster dir.")
-        """
-        
     def closeEvent(self, event):
         #try and pickle the session for later
         self.saveProject()
         #close our two threads
-        self.watcher_thread.quit()
-        self.srmonitor_thread.quit()
+        self.srmonitor_thread.terminate()
+        self.watcher_thread.terminate()
+        self.imageMover_thread.terminate()
         
-            
-
 #------------------------------------------------------------------------------ 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
-    #create our two child threads
+    #create our 3 child threads
     objThread = QtCore.QThread()
     serialThread = QtCore.QThread()
     imThread = QtCore.QThread()
