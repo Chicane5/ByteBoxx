@@ -45,8 +45,8 @@ class FileDialog(object):
         pass
     
     @staticmethod
-    def getFileFilter(self):
-        pass
+    def getFileFilter(pParent, pText, pFilter):
+        return QtGui.QFileDialog.getOpenFileNameAndFilter(pParent, QtCore.QString(pText), filter=pFilter)
         
 #===============================================================================
 # 

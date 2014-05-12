@@ -81,6 +81,8 @@ def enumerate_serial_ports():
 #===============================================================================
 class DirectoryPeriodCheck(QtCore.QObject):
     '''
+    This object constantly monitors our chosen photodownload directory for changes, and communicates
+    them back to our image mover object
     '''
     def __init__(self):
         super(DirectoryPeriodCheck, self).__init__()
@@ -137,19 +139,21 @@ class DirectoryPeriodCheck(QtCore.QObject):
                             
                             #what is this batchnumber?
                             thistrigger = int(root.split('_')[2])
-            
+                            #self.emit(QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), (thistrigger, os.path.join(self.dirToWatch, res[1])))
+                            
                             if any(jp in ext for jp in gJPGXTNS):
                                 if thistrigger not in self.filesDictJPG.keys():
                                     self.filesDictJPG[thistrigger] = []
                                 self.filesDictJPG[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
+                                self.emit(QtCore.SIGNAL("updatingJPGs()"))
                             elif any(cr in ext for cr in gCR2XTNS):
                                 if thistrigger not in self.filesDictCR2.keys():
                                     self.filesDictCR2[thistrigger] = []
                                 self.filesDictCR2[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
                             
-
-            self.updateDictionaries()
-            time.sleep(0.5)
+            #if self.filesDictCR2 != {} or self.filesDictJPG != {}:
+                #self.updateDictionaries()
+            #time.sleep(0.5)
             
     def updateDictionaries(self):
         self.emit(QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.filesDictJPG)
@@ -157,7 +161,70 @@ class DirectoryPeriodCheck(QtCore.QObject):
         if self.mErrors:
             self.emit(QtCore.SIGNAL("errorNotify(PyQt_PyObject)"), self.mErrors)
 
+#===============================================================================
+# 
+#===============================================================================
+class ImageMovers(QtCore.QObject):
+    '''
+    This object spins in a background thread and waits for notification of a new image set
+    '''
+    def __init__(self, watcher):
+        super(ImageMovers, self).__init__()
+        
+        self.watcher = watcher
+        self.takes = [] #tuple of (take path, empty list for images, comment)
+        self.filesDictJPG = {}
+        self.filesDictCR2 = {}
+        self.mErrorList = []
+        
+        self.connect(self.watcher, QtCore.SIGNAL("updatingJPGs()"), self.updatefilesDictJPG)
+        #self.connect(self.watcher, QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.updatefilesDictCR2)
+        #self.connect(self.watcher, QtCore.SIGNAL("errorNotify(PyQt_PyObject)"), self.updateErrors)
+        
+    #@pyqtSlot()
+    def addToTakes(self, take):
+        self.takes.append(take)
+        print "in image movers thread, here's the takes ", self.takes
+        
+    def updatefilesDictJPG(self):
+        '''
+        tuple of trigger and image path
+        '''
+        #print "updating JPGs with ", adict
+        #self.filesDictJPG = adict
+        #for k,v in self.filesDictJPG.iteritems():
+        for i, v in enumerate(self.takes):
+            if i+1 in self.watcher.filesDictJPG.keys():
+                if self.watcher.filesDictJPG[i+1] != []:
+                    while self.watcher.filesDictJPG[i+1] != []:
+                        for jpg in self.watcher.filesDictJPG[i+1]:
+                            try:
+                                lsplit = os.path.basename(jpg).split('_')
+                                shutil.move(jpg, os.path.join(str(v[0]), 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
+                                if os.path.isfile(os.path.join(str(v[0]), 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg')):
+                                    self.watcher.filesDictJPG[i+1].remove(jpg)
+                            except IOError:
+                                continue
+                        
+            
+    def _MoveEm(self, trigger_and_path, lsplit, trig):
+        if 'cr2' in trigger_and_path[1]:    
+            shutil.move(trigger_and_path[1], os.path.join(str(self.takes[trig-1][0]), 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
+        elif 'jpg' in trigger_and_path[1]:
+            shutil.move(trigger_and_path[1], os.path.join(str(self.takes[trig-1][0]), 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
+        
 
+    """
+    def updatefilesDictCR2(self, adict):
+        print "updating CR2s with ", adict
+        self.filesDictCR2 = adict
+        
+    def updateErrors(self, errorList):
+        for e in errorList:
+            if e not in self.mErrorList:
+                self.mErrorList.append(e)
+    """
+    
 #===============================================================================
 # 
 #===============================================================================
@@ -170,7 +237,6 @@ class SerialMonitor(QtCore.QObject):
         
     #@pyqtSlot()
     def updateSerialPort(self, serial):
-        print "update serial method called!"
         self.mSerial = serial
     
     @pyqtSlot()  
@@ -178,7 +244,7 @@ class SerialMonitor(QtCore.QObject):
         while True:
             val = self.mSerial.read(1)
             if val == 'c':
-                print "I got a FUCKIN C!!!!!"
+                self.emit(QtCore.SIGNAL("cableTrigger()"))
             time.sleep(1.5)
      
 #===============================================================================
@@ -191,7 +257,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
     cBAUD_RATE = 9600
     cPHOTO_DLOAD_DIR = "Z:\\dumpster\\SS"
     
-    def __init__(self, watcher, serialmonitor, parent=None):
+    def __init__(self, watcher, serialmonitor, imageMover, parent=None):
         super(MW_bbTriggerBoxx, self).__init__(parent)
         self.setupUi(self)
         
@@ -230,19 +296,25 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.connect(self.pushButton_prime, QtCore.SIGNAL("clicked()"), self.primeArray)
         
         #attrs
-        self.filesDictJPG = {}
-        self.filesDictCR2 = {}
-        self.mErrorList = []
-        self.activeTakeNames = []
+        #self.filesDictJPG = {}
+        #self.filesDictCR2 = {}
+        #self.mErrorList = []
+        #self.activeTakeNames = []
         
-        self.mSession = None
+        self.mSession = None #the main session for this run
 
+        #directory watcher & serial port stuffz
         self.watcher = watcher
-        self.connect(watcher, QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.updatefilesDictJPG)
-        self.connect(watcher, QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.updatefilesDictCR2)
-        self.connect(watcher, QtCore.SIGNAL("errorNotify(PyQt_PyObject)"), self.updateErrors)
+        self.watcher_thread = self.watcher.thread()
+
         
         self.srmonitor = serialmonitor
+        self.srmonitor_thread = self.srmonitor.thread()
+        self.connect(self.srmonitor, QtCore.SIGNAL("cableTrigger()"), self.triggeredFromCable)
+        
+        self.imageMover = imageMover
+        self.imageMover_thread = self.imageMover.thread()
+        self.connect(self, QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), self.imageMover.addToTakes)
         
         logging.basicConfig(format='%(asctime)s - %(levelname)s: %(message)s', \
                             level=logging.INFO, stream=self.textEdit_logging)
@@ -254,9 +326,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
     def _main(self):
         self.show()
         
-        #load/create a config file
-        #self.checkConfig() DEPR
-        
         #get the COM port we are on
         sr = self.findPort(MW_bbTriggerBoxx.cBAUD_RATE)
         if sr:
@@ -267,14 +336,17 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
         #pass the serial port instance to monitor & init the thread
         self.srmonitor.updateSerialPort(self.mSerial)
-        self.srmonitor.thread().start()
         
         #set our SmartShooter dir
         self.lineEdit_photoDownload.setText(MW_bbTriggerBoxx.cPHOTO_DLOAD_DIR)
         self.lineEdit_photoDownload.setReadOnly(True)
         
         self.watcher.updateDirToWatch(os.path.abspath(MW_bbTriggerBoxx.cPHOTO_DLOAD_DIR))
-        self.watcher.thread().start()
+        
+        #start our threads
+        self.srmonitor_thread.start()
+        self.watcher_thread.start()
+        self.imageMover_thread.start()
             
         
     def findPort(self, baud):
@@ -335,7 +407,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
     def populateFields(self):
         self.lineEdit_shootday.setText(self.mSession.mShootDay)
         self.lineEdit_bucket.setText(self.mSession.mBucket)
-
             
     def newProject(self):
         #create a smartShooter project instance, either mesh or texture - paremeters type and root folder
@@ -464,6 +535,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             #write to the arduino
             self.mSerial.write('b')
     
+    def triggeredFromCable(self):
+        self.logger.warning("got fire from cable trigger!")
+        self.fireArray()
+        
     def fireArray(self):
         if not self._checkForSession():
             return
@@ -494,13 +569,15 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.mSerial.write('a')
             
             #update our active take names
-            self.activeTakeNames.append((self.mSession.mActiveTakePath, self.lineEdit_comment.text()))          
+            #self.activeTakeNames.append((self.mSession.mActiveTakePath, self.lineEdit_comment.text()))  DEPR
+            self.emit(QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), (self.mSession.mActiveTakePath, [], self.lineEdit_comment.text()))
             #increment take?
             if self.checkBox_inc.isChecked():
                 self.spinBox_take.setValue(self.spinBox_take.value() + 1)
                 
             self.lineEdit_comment.clear()
             
+    """ DEPR
     def copyFromDumpster(self):
         '''
         we need to flush everything from Dumpster and create XML info for each take
@@ -538,14 +615,14 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
                     shutil.move(os.path.join(str(self.lineEdit_photoDownload.text()), errorFile), sortmedir)
         except:
             popup.Popup.warning(self, "Error moving some files to take directories - check dumpster dir.")
-        
+        """
         
     def closeEvent(self, event):
         #try and pickle the session for later
         self.saveProject()
         #close our two threads
-        self.watcher.thread().quit()
-        self.srmonitor.thread().quit()
+        self.watcher_thread.quit()
+        self.srmonitor_thread.quit()
         
             
 
@@ -555,7 +632,7 @@ if __name__ == "__main__":
     #create our two child threads
     objThread = QtCore.QThread()
     serialThread = QtCore.QThread()
-
+    imThread = QtCore.QThread()
 
     d = DirectoryPeriodCheck()
     d.moveToThread(objThread)
@@ -565,6 +642,9 @@ if __name__ == "__main__":
     srmonitor = SerialMonitor()
     srmonitor.moveToThread(serialThread)
     serialThread.started.connect(srmonitor.monitor)
-    win = MW_bbTriggerBoxx(d, srmonitor)
+    
+    im = ImageMovers(d)
+    im.moveToThread(imThread)
+    win = MW_bbTriggerBoxx(d, srmonitor, im)
     win._main()
     app.exec_()

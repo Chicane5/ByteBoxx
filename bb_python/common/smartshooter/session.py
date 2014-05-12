@@ -21,7 +21,7 @@ from util import utilbatchjobs
 #===============================================================================
 class DataTake(object):
     '''
-    describes a 'post' Session object to be passed into the render queue
+    describes a 'post' Project object to be passed into the render queue
     '''
     cMESH_DATA = 'meshdata'
     cTEX_DATA = 'texdata'
@@ -125,22 +125,18 @@ class TextureTake(DataTake):
 #===============================================================================
 # 
 #===============================================================================
-class Session(object):
+class Project(object):
     '''
-    describes a session - a container of an entire shootday of data.
+    describes a project - a container of multiple shootdays of data.
     Sessions are created under the root folder and have a discreet type.
-    Only one session 'type' can be created for a shootday. Dynamic member attributes
-    set current subject/character/definition/pose
     '''
     def __init__(self, pType, pRootFolder):
         self.mType = pType
-        self.mRootFolder = pRootFolder #i.e Z:\\
-        self.mShootFolder = '' #the user defined shoot directory "*_mesh", "*_texture"
+        self.mRootFolder = pRootFolder #i.e Z:\\DUMPSTER
+        self.mShootFolder = '' #the top level project directory
         self.mActivePath = ''
         self.mActiveTakePath = ''
         
-    def newSession(self):
-        pass
 
     def updateActivePath(self, basePath):
         '''
@@ -229,10 +225,11 @@ class Session(object):
         
         return True
     
+""" > DEPR
 #===============================================================================
 # 
 #===============================================================================
-class SetSession(Session):
+class SetSession(Project):
     
     def __init__(self, *args):
         super(SetSession, self).__init__(*args)
@@ -279,22 +276,28 @@ class SetSession(Session):
     def updateActivePath(self):
         super(SetSession, self).updateActivePath(os.path.join(self.mSubjectName, self.mCharacterName, self.mDefinition, self.mPose))
 
-
+"""
 #===============================================================================
 # 
 #===============================================================================
-class FlexSession(Session):
+class FlexSession(Project):
     '''
     flexible data container, for testing or fast iteration shoots
+    structure = PROJECT > shootday > bucket > take
     '''
     def __init__(self, *args):
         super(FlexSession, self).__init__(*args)
+        self.mShootDay = ''
         self.mBucket = ''
 
     def newSession(self):
+        self.newShootDay()
         self.updateBucket()
-        super(FlexSession, self).updateActivePath(self.mBucket)
+        self.updateActivePath()
     
+    def newShootDay(self, name='shootDay01'):
+        self.mShootDay = name
+        
     def updateBucket(self, name='bucket01'):
         '''
         update the bucket
@@ -302,5 +305,4 @@ class FlexSession(Session):
         self.mBucket = name
         
     def updateActivePath(self):
-        super(FlexSession, self).updateActivePath(self.mBucket)
-    
+        super(FlexSession, self).updateActivePath(os.path.join(self.mShootDay, self.mBucket))
