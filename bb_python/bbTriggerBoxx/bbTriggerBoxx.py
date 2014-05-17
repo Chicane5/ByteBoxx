@@ -9,7 +9,6 @@ import datetime as date
 import serial
 import time
 import pickle
-import Queue
 import logging
 import itertools
 
@@ -22,7 +21,6 @@ import _winreg as winreg
 
 #user
 from ui import bbTriggerBoxx_UI as uifile
-from ui import bbTriggerBoxx_config_UI as configuifile
 from qt import popup
 from smartshooter.session import  FlexSession
 from util import makepy2exe
@@ -85,9 +83,6 @@ class DirectoryPeriodCheck(QtCore.QObject):
     def __init__(self):
         super(DirectoryPeriodCheck, self).__init__()
         self.dirToWatch = None
-        self.filesDictJPG = {} #holds all the new jpg files in dumpster 
-        self.filesDictCR2 = {} #holds all the new cr2 files in dumpster
-        self.mErrors = []
         
         self.FILE_LIST_DIRECTORY = 0x0001
         self.hDir = None
@@ -131,64 +126,64 @@ class DirectoryPeriodCheck(QtCore.QObject):
                             #CAMERANAME_DATE_BATCHNUMBER eg AL01_20140101_0001
                             rsplit = root.split('_')
                             if len(rsplit) != 3:
-                                if res[1] not in self.mErrors:
-                                    self.mErrors.append(res[1])
+                                #pipe up that we dont have a sound convention
+                                self.emit(QtCore.SIGNAL("conventionError(QString)"), QtCore.QString(res[1]))
                                 continue
                             
                             #what is this batchnumber?
                             thistrigger = int(root.split('_')[2])
                             
                             if any(jp in ext for jp in gJPGXTNS):
-                                if thistrigger not in self.filesDictJPG.keys():
-                                    self.filesDictJPG[thistrigger] = []
-                                #self.filesDictJPG[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
+                                #send the object to our mover - jpg signel
                                 self.emit(QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), (thistrigger, os.path.join(self.dirToWatch, res[1])))
                             elif any(cr in ext for cr in gCR2XTNS):
-                                if thistrigger not in self.filesDictCR2.keys():
-                                    self.filesDictCR2[thistrigger] = []
-                                #self.filesDictCR2[thistrigger].append(os.path.join(self.dirToWatch, res[1]))
+                                #send the object to our mover - cr2 signel
                                 self.emit(QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), (thistrigger, os.path.join(self.dirToWatch, res[1])))
                             
-                    #if self.mErrors:
-                        #self.emit(QtCore.SIGNAL("errorFiles()"))
-            
 
 #===============================================================================
 # 
 #===============================================================================
 class ImageMovers(QtCore.QObject):
     '''
-    This object waits for notification of additions to the watchers directory structures and starts to pull data from them
+    This object runs in a background thread and receive update signals when new files drop in the watcher directory. It populates its
+    internal data structures with those files. Timers check the data structures every 3 seconds and 
     '''
+    cTIME_COUNT_FUNC = 150000
+    cTIME_MOVE_FUNC = 3000
+    
     def __init__(self, watcher):
         super(ImageMovers, self).__init__()
         
         self.watcher = watcher
-        self.takes = [] #take list gets updated by MainGui whenever we fire off a new take
+        self.takes = [] #Tuple of number of cameras fired and full path up to .../jpg. Updated by GUI when we fire a take
         self.takesToJpgs = {}
         self.takesToCR2s = {}
         
         self.timerJ = QtCore.QTimer() # jpg timer
         self.timerC = QtCore.QTimer() #cr2 timer
+        self.timerCounter = QtCore.QTimer() #check how many images end up in the final location
         self.timerJ.timeout.connect(self.moveJPG)
         self.timerC.timeout.connect(self.moveCR2) 
+        self.timerCounter.timeout.connect(self.checkCount)
         
         self.connect(self.watcher, QtCore.SIGNAL("updatingJPGs(PyQt_PyObject)"), self.updatefilesDictJPG)
         self.connect(self.watcher, QtCore.SIGNAL("updatingCR2s(PyQt_PyObject)"), self.updatefilesDictCR2)
-        #self.connect(self.watcher, QtCore.SIGNAL("errorFiles()"), self.cacheErrors)
         
-        
-        self.timerJ.start(3000)
-        self.timerC.start(3000)
+        self.timerJ.start(ImageMovers.cTIME_MOVE_FUNC)
+        self.timerC.start(ImageMovers.cTIME_MOVE_FUNC)
     
-    def addToTakes(self, take):
-        print "got new take ", take
-        self.takes.append(take)
+    def addToTakes(self, camCount_take):
+        print "got new take ", camCount_take[1]
+        print "camera number was", camCount_take[0]
+        self.takes.append(camCount_take)
         
     def updatefilesDictJPG(self, batchNo_filePath):
         '''
         when this signal is received, we get tuple of index and path
         '''
+        if not self.timerCounter.isActive():
+            self.timerCounter.start(ImageMovers.cTIME_COUNT_FUNC)
         if batchNo_filePath[0] not in self.takesToJpgs.keys():
             self.takesToJpgs[batchNo_filePath[0]] = []
         if batchNo_filePath[1] not in self.takesToJpgs[batchNo_filePath[0]]:
@@ -198,103 +193,48 @@ class ImageMovers(QtCore.QObject):
         '''
         when this signal is received, we get tuple of index and path
         '''
+        if not self.timerCounter.isActive():
+            self.timerCounter.start(ImageMovers.cTIME_COUNT_FUNC)
         if batchNo_filePath[0] not in self.takesToCR2s.keys():
             self.takesToCR2s[batchNo_filePath[0]] = []
         if batchNo_filePath[1] not in self.takesToCR2s[batchNo_filePath[0]]:
             self.takesToCR2s[batchNo_filePath[0]].append(os.path.abspath(batchNo_filePath[1]))
         
-        
     def moveJPG(self):
-        
-        
+        '''
+        iterates through our dictionary of take fires:jpg images and starts to move them into the proper locations
+        '''
         for k in self.takesToJpgs.keys():
-            print "key is ", k
-            index = int(k-1)
-            takePath = str(self.takes[index])
-            print "takePath is ", takePath
+            index = int(k-1) #our batch numbers start at 1, so minus for 0 based list
+            takePath = str(self.takes[index][1])
             for j in self.takesToJpgs[k]:
-                print "jpg is ", j
                 lsplit = os.path.basename(j).split('_')
-                print "lsplit is ", lsplit
                 shutil.move(j, os.path.join(takePath, 'jpg', lsplit[0]+'_'+lsplit[1]+ '_'+lsplit[2] ))
                 if os.path.isfile(os.path.join(takePath, 'jpg', lsplit[0]+'_'+lsplit[1]+ '_'+lsplit[2] )):
-                    print "yes its a file, removing"
                     self.takesToJpgs[k].remove(j)
                     
     def moveCR2(self):
-        
-        
+        '''
+        iterates through our dictionary of take fires:cr2 images and starts to move them into the proper locations
+        '''
         for k in self.takesToCR2s.keys():
-            print "key is ", k
-            index = int(k-1)
-            takePath = str(self.takes[index])
-            print "takePath is ", takePath
+            index = int(k-1) #our batch numbers start at 1, so minus for 0 based list
+            takePath = str(self.takes[index][1])
             for c in self.takesToCR2s[k]:
-                print "cr2 is ", c
                 lsplit = os.path.basename(c).split('_')
-                print "lsplit is ", lsplit
                 shutil.move(c, os.path.join(takePath, 'cr2', lsplit[0]+'_'+lsplit[1]+ '_'+lsplit[2]))
                 if os.path.isfile(os.path.join(takePath, 'cr2', lsplit[0]+'_'+lsplit[1]+ '_'+lsplit[2])):
-                    print "yes its a file, removing"
                     self.takesToCR2s[k].remove(c)
 
-        """
-        for i, v in enumerate(self.takes):
-            print i
-            if i+1 in self.watcher.filesDictJPG.keys():
-                print "key here" #make sure there is a valid key
-                if self.watcher.filesDictJPG[i+1] == []:
-                    print "empty"
-                    break
-                else:
-                    while self.watcher.filesDictJPG[i+1] != []:
-                        for jpg in self.watcher.filesDictJPG[i+1]:
-                            try:
-                                print jpg
-                                lsplit = os.path.basename(jpg).split('_')
-                                shutil.move(jpg, os.path.join(str(v[0]), 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg'))
-                                if os.path.isfile(os.path.join(str(v[0]), 'jpg', lsplit[0]+'_'+lsplit[1]+'.jpg')):
-                                    self.watcher.filesDictJPG[i+1].remove(jpg)
-                            except (IOError, WindowsError):
-                                print "fucking error"
-                                continue
-        
-                            
-    def updatefilesDictCR2(self):
-        '''
-        when this signal is received, we know that watcher has added more images to its interal CR2 structure
-        '''
-        print "got update CR2 signal"
-        for i, v in enumerate(self.takes):
-            if i+1 in self.watcher.filesDictCR2.keys(): #make sure there is a valid key
-                if self.watcher.filesDictCR2[i+1] != []:
-                    while self.watcher.filesDictCR2[i+1] != []:
-                        for cr2 in self.watcher.filesDictCR2[i+1]:
-                            try:
-                                lsplit = os.path.basename(cr2).split('_')
-                                shutil.move(cr2, os.path.join(str(v[0]), 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2'))
-                                if os.path.isfile(os.path.join(str(v[0]), 'cr2', lsplit[0]+'_'+lsplit[1]+'.cr2')):
-                                    self.watcher.filesDictCR2[i+1].remove(cr2)
-                            except (IOError, WindowsError):
-                                continue
-    
-    def cacheErrors(self):
-        '''
-        when this signal is received we know there have been error files that dont match our convention,
-        we will attempt to move them to an intermediary directory to deal with later
-        '''
-        
-        if self.mErrorList:
-            sortmedir = os.path.join(os.path.dirname(str(self.lineEdit_photoDownload.text())), 'tosort')
-            if not os.path.exists(sortmedir):
-                os.makedirs(sortmedir)
-                popup.Popup.warning(self, "{0} appears to have bad naming, check SmartShooter. Ignoring".format(','.join(self.mErrorList)))
-                for errorFile in self.mErrorList:
-        shutil.move(os.path.join(str(self.lineEdit_photoDownload.text()), errorFile), sortmedir)
-        
-        pass
-        """
-     
+    def checkCount(self):
+        for lCount_lTakePath in self.takes:
+            #compare what the operator said the count was to how many are actually in the folders
+            cr2s = [c for c in os.listdir(os.path.join(lCount_lTakePath[1], 'cr2'))]
+            jpgs = [j for j in os.listdir(os.path.join(lCount_lTakePath[1], 'jpg'))]
+            if len(cr2s) != lCount_lTakePath[0] or len(jpgs) != lCount_lTakePath[0]:
+                self.emit(QtCore.SIGNAL("countMismatch(QString)"), QtCore.QString(lCount_lTakePath[1]))
+                
+            
 #==============================================================================
 # 
 #===============================================================================
@@ -321,7 +261,7 @@ class SerialMonitor(QtCore.QObject):
                 self.emit(QtCore.SIGNAL("cableTrigger()"))
             time.sleep(1.5)
  
-     
+
 #===============================================================================
 # 
 #===============================================================================
@@ -366,6 +306,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
         #attrs
         self.batchCounter = 1
+        self.cameraNumberFlag = False
         self.mSession = None #the main session for this run __smartshooter.session.FlexSession__
 
         #directory watcher & serial port stuffz
@@ -380,6 +321,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.imageMover = imageMover
         self.imageMover_thread = self.imageMover.thread()
         self.connect(self, QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), self.imageMover.addToTakes)
+        self.connect(self.imageMover, QtCore.SIGNAL("countMismatch(QString)"), self.logCountMismatch)
         
         logging.basicConfig(format='%(asctime)s - %(levelname)s: %(message)s', \
                             level=logging.INFO, stream=self.textEdit_logging)
@@ -417,7 +359,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         #remind to reset smart shooter shit
         popup.Popup.critical(self, "REMEMBER TO RESET SMART SHOOTER BATCH TO 0001, CONVENTION: $CAM_$DATE_$BATCH")
             
-        
     def findPort(self, baud):
         ports = enumerate_serial_ports()
         for p in ports:
@@ -559,10 +500,12 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             return
         if self.CheckSerialComms():
             #check for camera count
-            if self.spinBox_cams.value() == 100:
+            if self.spinBox_cams.value() == 100 and not self.cameraNumberFlag:
                 q = popup.Popup.question(self, "current connected cameras is default 100 - correct?")
                 if q:
                     return
+            
+            self.cameraNumberFlag = True
             
             #create the take folders
             lTakeFolder = gTAKEDIR_PREFIX + str(self.spinBox_take.value()) if self.spinBox_take.value() > 9 else gTAKEDIR_PREFIX + '0' + str(self.spinBox_take.value())
@@ -588,7 +531,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.mSerial.write('a')
             
             #update our active take names
-            self.emit(QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), self.mSession.mActiveTakePath)
+            self.emit(QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), (self.spinBox_cams.value(), self.mSession.mActiveTakePath))
             #increment take?
             if self.checkBox_inc.isChecked():
                 self.spinBox_take.setValue(self.spinBox_take.value() + 1)
@@ -597,6 +540,9 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.batchCounter+=1
             self.lcdNumber_countdown.display(self.batchCounter)
             
+    def logCountMismatch(self, path):
+        self.logger.error("There appears to be a file count mismatch. Check the path at: \n{0}".format(path))
+        
     def closeEvent(self, event):
         #try and pickle the session for later
         self.saveProject()
