@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'bbTriggerBoxx_UI.ui'
 #
-# Created: Sun May 18 00:30:15 2014
+# Created: Sun May 18 23:08:16 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -277,7 +277,7 @@ class Ui_MainWindow_bbTriggerBoxx(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow_bbTriggerBoxx)
 
     def retranslateUi(self, MainWindow_bbTriggerBoxx):
-        MainWindow_bbTriggerBoxx.setWindowTitle(_translate("MainWindow_bbTriggerBoxx", "ByteBoxx::TRIGGERBOXX control v2.5 20140511", None))
+        MainWindow_bbTriggerBoxx.setWindowTitle(_translate("MainWindow_bbTriggerBoxx", "ByteBoxx::TRIGGERBOXX control v2.5 20140518", None))
         self.radioButton_mesh.setText(_translate("MainWindow_bbTriggerBoxx", "Mesh Project", None))
         self.radioButton_texture.setText(_translate("MainWindow_bbTriggerBoxx", "Texture Project", None))
         self.label_2.setText(_translate("MainWindow_bbTriggerBoxx", "Project:", None))

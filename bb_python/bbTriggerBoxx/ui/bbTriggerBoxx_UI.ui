@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>ByteBoxx::TRIGGERBOXX control v2.5 20140511</string>
+   <string>ByteBoxx::TRIGGERBOXX control v2.5 20140518</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_4">

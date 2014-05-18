@@ -159,6 +159,8 @@ class ImageMovers(QtCore.QObject):
         self.takes = [] #Tuple of number of cameras fired and full path up to .../jpg. Updated by GUI when we fire a take
         self.takesToJpgs = {}
         self.takesToCR2s = {}
+        self.checkForJPG = True
+        self.checkForCR2 = True
         
         self.timerJ = QtCore.QTimer() # jpg timer
         self.timerC = QtCore.QTimer() #cr2 timer
@@ -231,8 +233,23 @@ class ImageMovers(QtCore.QObject):
             #compare what the operator said the count was to how many are actually in the folders
             cr2s = [c for c in os.listdir(os.path.join(lCount_lTakePath[1], 'cr2'))]
             jpgs = [j for j in os.listdir(os.path.join(lCount_lTakePath[1], 'jpg'))]
-            if len(cr2s) != lCount_lTakePath[0] or len(jpgs) != lCount_lTakePath[0]:
-                self.emit(QtCore.SIGNAL("countMismatch(QString)"), QtCore.QString(lCount_lTakePath[1]))
+            if len(cr2s) != lCount_lTakePath[0] and self.checkForCR2:
+                self.emit(QtCore.SIGNAL("countMismatch(QString)"), QtCore.QString(os.path.join(lCount_lTakePath[1], 'cr2')))
+            if len(jpgs) != lCount_lTakePath[0] and self.checkForJPG:
+                self.emit(QtCore.SIGNAL("countMismatch(QString)"), QtCore.QString(os.path.join(lCount_lTakePath[1], 'jpg')))
+                
+    def checkForWhat(self, pState):
+        if self.sender().objectName() == "checkBox_cr2":
+            if pState == 2:
+                self.checkForCR2 = True
+            else:
+                self.checkForCR2 = False
+        elif self.sender().objectName() == "checkBox_jpg":
+            if pState == 2:
+                self.checkForJPG = True
+            else:
+                self.checkForJPG = False
+        
                 
             
 #==============================================================================
@@ -322,6 +339,8 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.imageMover_thread = self.imageMover.thread()
         self.connect(self, QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), self.imageMover.addToTakes)
         self.connect(self.imageMover, QtCore.SIGNAL("countMismatch(QString)"), self.logCountMismatch)
+        self.connect(self.checkBox_cr2, QtCore.SIGNAL("stateChanged(int)"), self.imageMover.checkForWhat)
+        self.connect(self.checkBox_jpg, QtCore.SIGNAL("stateChanged(int)"), self.imageMover.checkForWhat) 
         
         logging.basicConfig(format='%(asctime)s - %(levelname)s: %(message)s', \
                             level=logging.INFO, stream=self.textEdit_logging)
