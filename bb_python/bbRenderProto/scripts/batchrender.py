@@ -37,6 +37,7 @@ class BatchRender(object):
     def _main(self):
         #self._setAttrs()
         self._importFile()
+        self._createTurntable()
         
     def _setAttrs(self):
         cmds.setAttr("defaultResolution.imageSizeUnits", self.mUnits)
@@ -60,6 +61,9 @@ class BatchRender(object):
             os.makedirs(lSavePath)
         cmds.file(rename=lSavePath)
         cmds.file(s=True)
+        
+    def _createTurntable():
+        #self.mTurnTable.
     
     """
     def render(self, prefix):
