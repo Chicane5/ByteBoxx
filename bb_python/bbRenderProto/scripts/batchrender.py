@@ -19,7 +19,7 @@ class RenderUnits(object):
 class BatchRender(object):
     '''
     '''
-    def __init__(self, pIn, pBase, pOut):#units, width, height, resolution, rendercam):
+    def __init__(self, pIn, pOutPath, pBase=None):#units, width, height, resolution, rendercam):
         #self.mUnits = units
         #self.mWidth = width
         #self.mHeight = height
@@ -27,8 +27,9 @@ class BatchRender(object):
         #self.mRenderCam = rendercam
 
         self.mIn = pIn
+        self.mOutPath = pOutPath
         self.mBase = pBase
-        self.mOut = pOut
+        
         self.mTurnTable = turntable.TurnTable(preset=turntable.BodyScanPreset())
         
         self._main()
@@ -48,11 +49,17 @@ class BatchRender(object):
 
         
     def  _importFile(self):
-        if os.path.isfile(self.mBase):
-            cmds.file(self.mBase, o=True)
+        #try and grab a base lighting scene
+        if self.mBase != None and os.path.isfile(self.mBase):
+            cmds.file(self.mBase, open=True, force=True)
+            
         cmds.loadPlugin("fbxmaya")
         cmds.file(self.mIn, i=True)
-        self.render(self.mOut)
+        lSavePath = r"" + (os.path.join(self.mOutPath, "Test.mb"))
+        if not os.path.exists(lSavePath):
+            os.makedirs(lSavePath)
+        cmds.file(rename=lSavePath)
+        cmds.file(s=True)
     
     """
     def render(self, prefix):
@@ -70,5 +77,8 @@ if __name__ == "__main__":
     maya.standalone.initialize(name='python')
     cmds.file(new=True, f=True)
     
-    c = BatchRender(sys.argv[1], sys.argv[2], sys.argv[3])
+    if len(sys.argv) == 3:
+        c = BatchRender(sys.argv[1], sys.argv[2])
+    elif len(sys.argv) == 4:
+        c = BatchRender(sys.argv[1], sys.argv[2], sys.argv[3])
     #c(sys.argv[1])
