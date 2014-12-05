@@ -64,6 +64,7 @@ class BatchRender(object):
         
     def _createTurntable():
         #self.mTurnTable.
+        pass
     
     """
     def render(self, prefix):
