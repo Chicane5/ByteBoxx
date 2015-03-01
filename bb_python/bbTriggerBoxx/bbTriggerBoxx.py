@@ -287,7 +287,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
     TriggerBoxx main window class
     '''
     cBAUD_RATE = 9600
-    cPHOTO_DLOAD_DIR = "Z:\\dumpster\\SS"
+    #cPHOTO_DLOAD_DIR = "Z:\\dumpster\\SS"
     
     def __init__(self, watcher, serialmonitor, imageMover, parent=None):
         super(MW_bbTriggerBoxx, self).__init__(parent)
@@ -322,6 +322,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.connect(self.pushButton_prime, QtCore.SIGNAL("clicked()"), self.primeArray)
         
         #attrs
+        self.photoDownloadDir = ""
         self.batchCounter = 1
         self.cameraNumberFlag = False
         self.mSession = None #the main session for this run __smartshooter.session.FlexSession__
@@ -360,15 +361,19 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.logger.info("found TriggerBoxx Hardware on {0}".format(sr.port))
             sr.flush()
             self.mSerial = sr
+        else:
+            popup.Popup.critical(self, "Serial Port error - check permissions")
+            
         
         #pass the serial port instance to monitor & init the thread
         self.srmonitor.updateSerialPort(self.mSerial)
         
         #set our SmartShooter dir
-        self.lineEdit_photoDownload.setText(MW_bbTriggerBoxx.cPHOTO_DLOAD_DIR)
+        self.photoDownloadDir = popup.FileDialog().getDirectory(self, "Select your download dir" )
+        self.lineEdit_photoDownload.setText(self.photoDownloadDir)
         self.lineEdit_photoDownload.setReadOnly(True)
         
-        self.watcher.updateDirToWatch(os.path.abspath(MW_bbTriggerBoxx.cPHOTO_DLOAD_DIR))
+        self.watcher.updateDirToWatch(os.path.abspath(self.photoDownloadDir))
         
         #start our threads
         self.srmonitor_thread.start()
@@ -379,6 +384,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         popup.Popup.critical(self, "REMEMBER TO RESET SMART SHOOTER BATCH TO 0001, CONVENTION: $CAM_$DATE_$BATCH")
             
     def findPort(self, baud):
+        sr = None
         ports = enumerate_serial_ports()
         for p in ports:
             try:
@@ -405,9 +411,15 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         #get a name from the user for a new project
         lFolderName = str(popup.Input.getText(self, "Enter Project Root Name")[0])
         lProjectFolder = os.path.join(os.path.dirname(self.mSession.mRootFolder), lFolderName + '_' + self.mSession.mType)
+        print lProjectFolder
         
         if not os.path.exists(os.path.abspath(lProjectFolder)):
-            os.makedirs(lProjectFolder)
+            try:
+                os.makedirs(lProjectFolder)
+            except:
+                popup.Popup.critical(self, "could not create project dir!!")
+                return
+            
         self.mSession.mShootFolder = lProjectFolder
         self.lineEdit_projectRoot.setText(lProjectFolder)
 
@@ -519,13 +531,14 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             return
         if self.CheckSerialComms():
             #check for camera count
+            """
             if self.spinBox_cams.value() == 100 and not self.cameraNumberFlag:
                 q = popup.Popup.question(self, "current connected cameras is default 100 - correct?")
                 if q:
                     return
             
             self.cameraNumberFlag = True
-            
+            """
             #create the take folders
             lTakeFolder = gTAKEDIR_PREFIX + str(self.spinBox_take.value()) if self.spinBox_take.value() > 9 else gTAKEDIR_PREFIX + '0' + str(self.spinBox_take.value())
             lActiveTakePath = os.path.join(self.mSession.mActivePath, lTakeFolder)

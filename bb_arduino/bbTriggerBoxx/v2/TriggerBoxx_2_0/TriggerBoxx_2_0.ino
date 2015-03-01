@@ -1,96 +1,103 @@
 /*
 TRIGGERBOXX V2.0
+gary@byteboxx.com 01/03/2015
 */
 
-const int buttonPin = 9;     // the number of the pushbutton pin
-const int ledPin =  13;      // the number of the LED pin
-int focus = 2;
-int shutter = 4;
-int flash = 7;
+// PINS - these dont change
+const int led =  13;      // RED (FRONT)
+const int trigger = 9;     
+const int focus = 2;      // GREEN
+const int shutter = 4;    // RED
+const int flash = 7;      // BLUE
 
 
-// variables will change:
+// variables
 char c;                      //the command char sent from TriggerBoxx UI
-int buttonState = 0;         // variable for reading the pushbutton status
-boolean hasTriggered = false;
+int triggerState = 0;         // variable for reading the cable trigger status
 
 void setup() {
  
-  pinMode(ledPin, OUTPUT); //LED for testing only RED - FRONT
-  
-  pinMode(buttonPin, INPUT); //cable trigger  
-  pinMode(focus, OUTPUT); //cam focus (button half pressed) GREEN 
-  pinMode(shutter, OUTPUT); //cam shutter RED
-  pinMode(flash, OUTPUT); //strobes BLUE
+  pinMode(led, OUTPUT); //debug led
+  pinMode(trigger, INPUT); //cable trigger  
+  pinMode(focus, OUTPUT); //cam focus (button half pressed) 
+  pinMode(shutter, OUTPUT); //cam shutter
+  pinMode(flash, OUTPUT); //strobes
   
   Serial.begin(9600);  
 }
 
 void loop(){
   
-  //digitalWrite(focus, HIGH);
-  //digitalWrite(shutter, HIGH);
-  //digitalWrite(flash, HIGH);
+  //check for anything being sent over serial from Python
+
+  if(Serial.available() > 0){ // Don't read unless you know there is data
   
-  
-  // read the state of the pushbutton value:
-  
-  
-  while(Serial.available() > 0) // Don't read unless you know there is data
-  {
     c = Serial.read(); // Read a character
         
-        if( c == 'a')
-        {
-          //firing array
-          //digitalWrite(ledPin, HIGH);
-          doTrigger();
-          delay(2000);
-        }
-        else if( c == 'b')
-        {
-          //priming array
-          digitalWrite(focus, HIGH);
-          delay(10);
-          digitalWrite(focus, LOW);
-          
-          digitalWrite(shutter, HIGH); //mirror lock
-          //digitalWrite(ledPin, LOW);
-        }
-   }
-   
-   //did we take a cable trigger?
-  buttonState = digitalRead(buttonPin);
-
-  // check if the pushbutton is pressed.
-  // if it is, the buttonState is HIGH:
-  if (buttonState == HIGH) {     
-    // turn LED on:
-    if (! hasTriggered){
-      hasTriggered = true;
-      Serial.write('c');
-    }      
-    //digitalWrite(ledPin, HIGH);
-    doTrigger();
-    delay(2000);
-  } 
-  else {
+    if( c == 'a'){
     
-    // turn LED off:
-    //digitalWrite(ledPin, LOW);
-    hasTriggered = false; 
+      //FIRE ARRAY
+      fireArray(false);
+      delay(2000);
+    }
+    else if( c == 'b'){
+    
+      //PRIME ARRAY
+      primeArray();
+      delay(2000); 
+    }    
   }
-  
+   
+  //if nothing from the UI, did we take a cable trigger?
+  readCable();
+    
 }
 
-void doTrigger(){
-  //func to actually trigger
-  digitalWrite(shutter, LOW);
-  delay(80);
-  digitalWrite(flash, HIGH);
-  
-  delay(20);
-  digitalWrite(shutter, HIGH);
-  digitalWrite(flash, LOW);
+void readCable(){
+  //read the input of trigger pin
+  triggerState = digitalRead(trigger);
+  if (triggerState == HIGH){
+   //PRIME
+   primeArray();
+   delay(2000);
+   delay(3000);
+   fireArray(true);
+   delay(2000);
+   return;
+  }
 }
+
+
+void fireArray(boolean pFromCable){
+  //func to actually trigger - depresses the shutter and fires strobes after dialled in delay
+  digitalWrite(shutter, HIGH);
+  delay(100);
+  digitalWrite(shutter, LOW);
+  delay(80); //dialled in delay
+  digitalWrite(flash, HIGH);
+ 
+  delay(100); //strobe on duration
+ 
+  digitalWrite(flash, LOW);
   
+  //reset trigger flag
+  if (pFromCable){
+    ;
+    //communicate trigger back to python
+    //Serial.write('c');
+  }
+}
+
+
+void primeArray(){
+  //func to suto-focus the lens (shutter half way) and ping mirror up
+  digitalWrite(focus, HIGH);
+  delay(100);
+  digitalWrite(focus, LOW);
+         
+  digitalWrite(shutter, HIGH); //mirror lock
+  delay(100);
+  digitalWrite(shutter, LOW);
+  
+}
+ 
