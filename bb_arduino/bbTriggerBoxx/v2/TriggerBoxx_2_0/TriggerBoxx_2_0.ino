@@ -37,7 +37,7 @@ void loop(){
     if( c == 'a'){
     
       //FIRE ARRAY
-      fireArray(false);
+      fireArray();
       delay(2000);
     }
     else if( c == 'b'){
@@ -57,18 +57,23 @@ void readCable(){
   //read the input of trigger pin
   triggerState = digitalRead(trigger);
   if (triggerState == HIGH){
+    
    //PRIME
    primeArray();
    delay(2000);
-   delay(3000);
-   fireArray(true);
+   Serial.write('c');
+   delay(3000); //delay while we do folder creation etc back in Python GUI
+   fireArray();
    delay(2000);
    return;
+  }
+  else{
+    return;
   }
 }
 
 
-void fireArray(boolean pFromCable){
+void fireArray(){
   //func to actually trigger - depresses the shutter and fires strobes after dialled in delay
   digitalWrite(shutter, HIGH);
   delay(100);
@@ -80,12 +85,6 @@ void fireArray(boolean pFromCable){
  
   digitalWrite(flash, LOW);
   
-  //reset trigger flag
-  if (pFromCable){
-    ;
-    //communicate trigger back to python
-    //Serial.write('c');
-  }
 }
 
 

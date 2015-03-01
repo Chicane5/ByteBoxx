@@ -125,13 +125,13 @@ class DirectoryPeriodCheck(QtCore.QObject):
                             #make sure we are dealing with the following convention from SmartCrap:
                             #CAMERANAME_DATE_BATCHNUMBER eg AL01_20140101_0001
                             rsplit = root.split('_')
-                            if len(rsplit) != 3:
+                            if len(rsplit) < 3:
                                 #pipe up that we dont have a sound convention
                                 self.emit(QtCore.SIGNAL("conventionError(QString)"), QtCore.QString(res[1]))
                                 continue
                             
                             #what is this batchnumber?
-                            thistrigger = int(root.split('_')[2])
+                            thistrigger = int(root.split('_')[-1])
                             
                             if any(jp in ext for jp in gJPGXTNS):
                                 #send the object to our mover - jpg signel
@@ -147,7 +147,7 @@ class DirectoryPeriodCheck(QtCore.QObject):
 class ImageMovers(QtCore.QObject):
     '''
     This object runs in a background thread and receive update signals when new files drop in the watcher directory. It populates its
-    internal data structures with those files. Timers check the data structures every 3 seconds and 
+    internal data structures with those files. Timers check the data structures every 3 seconds
     '''
     cTIME_COUNT_FUNC = 150000
     cTIME_MOVE_FUNC = 3000
@@ -258,7 +258,7 @@ class ImageMovers(QtCore.QObject):
 class SerialMonitor(QtCore.QObject):
     '''
     The serial monitor spins in another seperate thread and listens for the Arduino writing back to the PC -
-    in this case we want to emit the signal we have been triggered from cable and fire off a take as usal
+    in this case we want to emit the signal we have been triggered from cable and fire off a take as usual
     '''
     def __init__(self):
         super(SerialMonitor, self).__init__()
@@ -287,7 +287,6 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
     TriggerBoxx main window class
     '''
     cBAUD_RATE = 9600
-    #cPHOTO_DLOAD_DIR = "Z:\\dumpster\\SS"
     
     def __init__(self, watcher, serialmonitor, imageMover, parent=None):
         super(MW_bbTriggerBoxx, self).__init__(parent)
@@ -311,10 +310,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         #action connections
         self.connect(self.actionMesh, QtCore.SIGNAL("triggered()"), self.newProject)
         self.connect(self.actionTexture, QtCore.SIGNAL("triggered()"), self.newProject)
+        
         self.connect(self.actionLoad_Project, QtCore.SIGNAL("triggered()"), self.loadProject)
         self.connect(self.actionSave_Project, QtCore.SIGNAL("triggered()"), self.saveProject)
         self.connect(self.actionNewShootday, QtCore.SIGNAL("triggered()"), self.updateShootDay)
-        
         self.connect(self.lineEdit_bucket, QtCore.SIGNAL("returnPressed()"), self.updateBucket)
         
         #main buttons
@@ -327,15 +326,16 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.cameraNumberFlag = False
         self.mSession = None #the main session for this run __smartshooter.session.FlexSession__
 
-        #directory watcher & serial port stuffz
+        #directory watcher
         self.watcher = watcher
         self.watcher_thread = self.watcher.thread()
 
-        
+        #serial port monitor looking for cable fire
         self.srmonitor = serialmonitor
         self.srmonitor_thread = self.srmonitor.thread()
         self.connect(self.srmonitor, QtCore.SIGNAL("cableTrigger()"), self.triggeredFromCable)
         
+        #background image moving thread
         self.imageMover = imageMover
         self.imageMover_thread = self.imageMover.thread()
         self.connect(self, QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), self.imageMover.addToTakes)
@@ -373,6 +373,7 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.lineEdit_photoDownload.setText(self.photoDownloadDir)
         self.lineEdit_photoDownload.setReadOnly(True)
         
+        #communicate the update of directory to our watcher object
         self.watcher.updateDirToWatch(os.path.abspath(self.photoDownloadDir))
         
         #start our threads
@@ -380,8 +381,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.watcher_thread.start()
         self.imageMover_thread.start()
         
-        #remind to reset smart shooter shit
-        popup.Popup.critical(self, "REMEMBER TO RESET SMART SHOOTER BATCH TO 0001, CONVENTION: $CAM_$DATE_$BATCH")
+
+            
+        #finally remind to reset smart shooter shit
+        popup.Popup.warning(self, "REMEMBER TO RESET SMART SHOOTER BATCH TO 0001, CONVENTION: $CAMNAME_$DATE_$BATCH")
             
     def findPort(self, baud):
         sr = None
@@ -407,19 +410,17 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             self.radioButton_mesh.setChecked(True)
         elif self.mSession.mType == 'Texture':
             self.radioButton_texture.setChecked(True)
-            
+
         #get a name from the user for a new project
         lFolderName = str(popup.Input.getText(self, "Enter Project Root Name")[0])
         lProjectFolder = os.path.join(os.path.dirname(self.mSession.mRootFolder), lFolderName + '_' + self.mSession.mType)
         print lProjectFolder
         
         if not os.path.exists(os.path.abspath(lProjectFolder)):
-            try:
-                os.makedirs(lProjectFolder)
-            except:
-                popup.Popup.critical(self, "could not create project dir!!")
+            lMade = self.createFolderWithCheck(lProjectFolder)
+            if not lMade:
                 return
-            
+
         self.mSession.mShootFolder = lProjectFolder
         self.lineEdit_projectRoot.setText(lProjectFolder)
 
@@ -428,8 +429,10 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         
         #create this path if it doenst exist
         if not os.path.exists(os.path.abspath(self.mSession.mActivePath)):
-            os.makedirs(self.mSession.mActivePath)
-        
+            lMade = self.createFolderWithCheck(self.mSession.mActivePath)
+            if not lMade:
+                return 
+            
         #switch off
         self.radioButton_mesh.setEnabled(False)
         self.radioButton_texture.setEnabled(False)    
@@ -437,6 +440,14 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         self.populateTreeView()
         self.logger.info("created new project at {0}".format(lProjectFolder))
     
+    def createFolderWithCheck(self, pFolder):
+        try:
+            os.makedirs(pFolder)
+        except:
+            popup.Popup.critical(self, "could not create requested directory!!")
+            return False
+        return True
+            
     def loadProject(self):
         #directory popup to pick a TBS file
         lTBSFile = popup.FileDialog.getFileFilter(self, "pick an existing .TBS project file", '*.tbs')
@@ -512,33 +523,34 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
         except AssertionError:
             popup.Popup.critical(self, "no serial port defined!")
             return False
-    
         return True
     
     def primeArray(self):
         if not self._checkForSession():
             return
+        
+        #check for camera count 
+        if self.spinBox_cams.value() == 100 and not self.cameraNumberFlag:
+            q = popup.Popup.question(self, "current connected cameras is default 100 - correct?")
+            if not q == 0:
+                return    
+        self.cameraNumberFlag = True
+        
         if self.CheckSerialComms():
             #write to the arduino
             self.mSerial.write('b')
     
     def triggeredFromCable(self):
         self.logger.warning("got fire from cable trigger!")
-        self.fireArray()
+        # self.fireArray() NO WE DONT WANT TO DO THAT YOU STUPID SOD
+        self.preFireArray()
+        self.postFireArray()
         
-    def fireArray(self):
-        if not self._checkForSession():
-            return
+    def preFireArray(self):
+        #directory creation and checks before we actually fire the cameras
+
         if self.CheckSerialComms():
-            #check for camera count
-            """
-            if self.spinBox_cams.value() == 100 and not self.cameraNumberFlag:
-                q = popup.Popup.question(self, "current connected cameras is default 100 - correct?")
-                if q:
-                    return
-            
-            self.cameraNumberFlag = True
-            """
+
             #create the take folders
             lTakeFolder = gTAKEDIR_PREFIX + str(self.spinBox_take.value()) if self.spinBox_take.value() > 9 else gTAKEDIR_PREFIX + '0' + str(self.spinBox_take.value())
             lActiveTakePath = os.path.join(self.mSession.mActivePath, lTakeFolder)
@@ -559,18 +571,24 @@ class MW_bbTriggerBoxx(QtGui.QMainWindow, uifile.Ui_MainWindow_bbTriggerBoxx):
             except:
                 popup.Popup.warning(self, "Error creating take directory, check permission")
             
-            #write to the arduino
-            self.mSerial.write('a')
+    def postFireArray(self):
+        #update our active take names
+        self.emit(QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), (self.spinBox_cams.value(), self.mSession.mActiveTakePath))
+        #increment take?
+        if self.checkBox_inc.isChecked():
+            self.spinBox_take.setValue(self.spinBox_take.value() + 1)
             
-            #update our active take names
-            self.emit(QtCore.SIGNAL("updatingTakes(PyQt_PyObject)"), (self.spinBox_cams.value(), self.mSession.mActiveTakePath))
-            #increment take?
-            if self.checkBox_inc.isChecked():
-                self.spinBox_take.setValue(self.spinBox_take.value() + 1)
-                
-            self.lineEdit_comment.clear()
-            self.batchCounter+=1
-            self.lcdNumber_countdown.display(self.batchCounter)
+        self.lineEdit_comment.clear()
+        self.batchCounter+=1
+        self.lcdNumber_countdown.display(self.batchCounter)
+        
+    def fireArray(self):
+        if not self._checkForSession():
+            return
+        self.preFireArray()
+        #write to the arduino
+        self.mSerial.write('a')
+        self.postFireArray()
             
     def logCountMismatch(self, path):
         self.logger.error("There appears to be a file count mismatch. Check the path at: \n{0}".format(path))
